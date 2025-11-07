@@ -1,10 +1,10 @@
 <!-- index.html -->
-<!-- ISO Timestamp: 🕒 2025-10-10T10:00:00Z (Account Assistant PRO temporary viewer) -->
+<!-- ISO Timestamp: 🕒 2025-11-07T09:20:00Z (Budget Assistant 2025 viewer) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Accountant Assistant PRO</title>
+  <title>Budget Assistant 2025</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css" />
   <style>
@@ -16,14 +16,14 @@
 </head>
 <body>
   <div>
-    <h2>Accountant Assistant PRO</h2>
+    <h2>Budget Assistant 2025</h2>
     <p>🕒 ISO Timestamp: <span id="iso-timestamp"></span></p>
 
-    <input type="text" id="query" placeholder="Enter an accounting question (e.g. CIS repayment process)" />
+    <input type="text" id="query" placeholder="Enter a Budget question (e.g. Capital allowances changes 2024)" />
     <input type="email" id="email" placeholder="Your email (optional)" />
     <input type="text" id="firstName" placeholder="First name (optional)" />
     <input type="text" id="lastName" placeholder="Last name (optional)" />
-    <button id="generate">Generate Accountant Assistasnt PRO Report</button>
+    <button id="generate">Generate Budget 2025 Report</button>
 
     <h3>Result</h3>
     <pre id="output"></pre>
@@ -49,15 +49,15 @@
         return;
       }
 
-      output.textContent = "⏳ Generating Accountant Report...";
+      output.textContent = "⏳ Generating Budget 2025 Report...";
       try {
-        const res = await fetch("/api/blog-draft", {
+        const res = await fetch("/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ topic: query, email, firstName, lastName })
+          body: JSON.stringify({ question: query, email, firstName, lastName })
         });
         const data = await res.json();
-        output.textContent = data.reportText || data.blogText || JSON.stringify(data, null, 2);
+        output.textContent = data.answer || JSON.stringify(data, null, 2);
       } catch (err) {
         output.textContent = "❌ Error: " + err.message;
       }
