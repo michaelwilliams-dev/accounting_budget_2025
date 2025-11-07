@@ -1,6 +1,7 @@
-// server.js — Accountant Assistant PRO (pure-JS version)
-// ISO Timestamp: 🕒 2025-10-15T02:10:00Z
-// ✅ Added FAISS chunk count to footer (PDF + Word) — no other changes
+// server.js — Budget Assistant (pure-JS version)
+// ISO Timestamp: 🕒 2025-11-07T09:10:00Z
+// ✅ Rebranded from Accountant Assistant PRO → Budget Assistant 2025
+//    All functionality retained (Mailjet, fairness check, PDF, Word, FAISS)
 
 import express from "express";
 import bodyParser from "body-parser";
@@ -23,7 +24,7 @@ app.options("*", cors());
 // Allow assistants.aivs.uk (any subdomain) and the backend itself for internal requests
 const allowedDomains = [
   "assistants.aivs.uk",
-  "account-assistant-pro.onrender.com"
+  "budget-assistant.onrender.com"
 ];
 
 function verifyOrigin(req, res, next) {
@@ -36,8 +37,6 @@ function verifyOrigin(req, res, next) {
 
   try {
     const { hostname } = new URL(origin);
-
-    // allow if the hostname matches or ends with any allowed domain
     const allowed = allowedDomains.some(
       (d) => hostname === d || hostname.endsWith(`.${d}`)
     );
@@ -69,7 +68,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 let globalIndex = null;
 (async () => {
   try {
-    console.log("📦 Preloading FAISS vector index (10 000 chunks)...");
+    console.log("📦 Preloading FAISS vector index (Budget Assistant)...");
     globalIndex = await loadIndex(10000);
     console.log(`✅ Preloaded ${globalIndex.length.toLocaleString()} vectors.`);
   } catch (e) {
@@ -93,25 +92,25 @@ async function queryFaissIndex(question) {
 }
 
 /* ----------------------- Report Generator ----------------------------- */
-async function generateAccountantReport(query) {
+async function generateBudgetReport(query) {
   const { joined, count } = await queryFaissIndex(query);
   let context = joined;
   if (context.length > 50000) context = context.slice(0, 50000);
 
   const prompt = `
-You are a qualified UK accountant preparing a formal internal compliance report.
-Use the HMRC manuals and guidance below to create a structured report.
+You are a UK fiscal policy analyst preparing a professional summary
+based on the Autumn Budget 2025. Use the Treasury and OBR context below.
 
 Question: "${query}"
 
 Structure:
 1. Query
-2. Who can reclaim or is affected
-3. Guidance
-4. Evidence required
-5. Common blockers or refusals
-6. Key HMRC manual references
-7. Practical wrap-up
+2. Summary of Measures
+3. Fiscal & Economic Impact
+4. Business/Household Implications
+5. Key Figures & Dates
+6. Source References
+7. Wrap-up
 
 Context:
 ${context}`.trim();
@@ -144,7 +143,6 @@ ${context}`.trim();
     fairnessResult = "Fairness verification not completed (" + e.message + ")";
   }
 
-  // --- Generate random Reg. No. with FAISS chunk count ---
   const now = new Date();
   const dateSeed = `${String(now.getFullYear()).slice(2)}${String(
     now.getMonth() + 1
@@ -154,14 +152,14 @@ ${context}`.trim();
 
   const footer = `
 
-This report was prepared using the AIVS FAISS-indexed HMRC knowledge base,
-derived entirely from verified UK Government publications and official manuals.
-It is provided for internal compliance and advisory purposes only and should not
-be relied upon as a substitute for professional accounting or tax advice.
+This report was prepared using the AIVS FAISS-indexed Autumn Budget 2025 data,
+derived entirely from verified UK Treasury and OBR publications.
+It is provided for informational purposes and should not be relied upon as
+financial or legal advice.
 
 ISO 42001 Fairness Verification: ${fairnessResult}
-Reg. No. AIVS/UK/${regRand}/${count}
- © AIVS Software Limited 2025 — All rights reserved.`;
+Reg. No. AIVS/UK/BUDG/${regRand}/${count}
+© AIVS Software Limited 2025 — All rights reserved.`;
 
   return `${text}\n\n${footer}`;
 }
@@ -219,7 +217,7 @@ async function buildPdfBufferStructured({ fullName, ts, question, reportText }) 
     }
   };
 
-  draw("Accountant Assistant PRO Report", margin, y, fsTitle, fontBold);
+  draw("Budget Assistant Report", margin, y, fsTitle, fontBold);
   y -= fsTitle * 1.4;
   para(`Prepared for: ${fullName || "N/A"}`, margin);
   para(`Timestamp (UK): ${ts}`, margin);
@@ -233,17 +231,14 @@ async function buildPdfBufferStructured({ fullName, ts, question, reportText }) 
 }
 
 /* ------------------------------ /ask ---------------------------------- */
-
-/* ------------------------------ /SECURITY ADD ---------------------------------- */
 app.post("/ask", verifyOrigin, async (req, res) => {
-  /* ------------------------------ /SECURITY AD ---------------------------------- */
   const { question, email, managerEmail, clientEmail } = req.body || {};
-  console.log("🧾 /ask", { question, email, managerEmail, clientEmail });
+  console.log("🧾 /ask (Budget)", { question, email, managerEmail, clientEmail });
   if (!question) return res.status(400).json({ error: "Missing question" });
 
   try {
     const ts = new Date().toISOString();
-    const reportText = await generateAccountantReport(question);
+    const reportText = await generateBudgetReport(question);
     const pdfBuf = await buildPdfBufferStructured({
       fullName: email,
       ts,
@@ -257,7 +252,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
       new Paragraph({
         children: [
           new TextRun({
-            text: "ACCOUNTANT ASSISTANT PRO REPORT",
+            text: "BUDGET ASSISTANT REPORT",
             bold: true,
             size: 32,
           }),
@@ -269,9 +264,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
 
     docParagraphs.push(
       new Paragraph({
-        children: [
-          new TextRun({ text: `Generated ${ts}`, bold: true, size: 24 }),
-        ],
+        children: [new TextRun({ text: `Generated ${ts}`, bold: true, size: 24 })],
         alignment: "center",
         spacing: { after: 300 },
       })
@@ -349,12 +342,12 @@ app.post("/ask", verifyOrigin, async (req, res) => {
     const regRand = `${dateSeed}-${randomPart}`;
 
     const footerText = `
-This report was prepared using the AIVS FAISS-indexed HMRC knowledge base,
-derived entirely from verified UK Government publications and official manuals.
-It is provided for internal compliance and advisory purposes only and should not
-be relied upon as a substitute for professional accounting or tax advice.
+This report was prepared using the AIVS FAISS-indexed Autumn Budget 2025 data,
+derived entirely from verified UK Treasury and OBR publications.
+It is provided for informational purposes and should not be relied upon as
+financial or legal advice.
 
-Reg. No. AIVS/UK/${regRand}/${globalIndex ? globalIndex.length : 0}
+Reg. No. AIVS/UK/BUDG/${regRand}/${globalIndex ? globalIndex.length : 0}
 © AIVS Software Limited 2025 — All rights reserved.`;
 
     docParagraphs.push(
@@ -382,16 +375,13 @@ Reg. No. AIVS/UK/${regRand}/${globalIndex ? globalIndex.length : 0}
         body: JSON.stringify({
           Messages: [
             {
-              From: {
-                Email: "noreply@securemaildrop.uk",
-                Name: "Secure Maildrop",
-              },
+              From: { Email: "noreply@securemaildrop.uk", Name: "Secure Maildrop" },
               To: [
                 { Email: email },
                 { Email: managerEmail },
                 { Email: clientEmail },
               ].filter((r) => r.Email),
-              Subject: "Your AI Accountant Report",
+              Subject: "Your AI Budget Report",
               TextPart: reportText,
               HTMLPart: reportText
                 .split("\n")
@@ -400,13 +390,13 @@ Reg. No. AIVS/UK/${regRand}/${globalIndex ? globalIndex.length : 0}
               Attachments: [
                 {
                   ContentType: "application/pdf",
-                  Filename: `audit-${ts}.pdf`,
+                  Filename: `budget-${ts}.pdf`,
                   Base64Content: pdfBuf.toString("base64"),
                 },
                 {
                   ContentType:
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                  Filename: "report.docx",
+                  Filename: "budget-report.docx",
                   Base64Content: docBuf.toString("base64"),
                 },
               ],
@@ -428,9 +418,9 @@ Reg. No. AIVS/UK/${regRand}/${globalIndex ? globalIndex.length : 0}
 });
 
 app.get("/", (req, res) =>
-  res.sendFile(path.join(__dirname, "public", "accountant.html"))
+  res.sendFile(path.join(__dirname, "public", "budget.html"))
 );
 
 app.listen(Number(PORT), "0.0.0.0", () =>
-  console.log(`🟢 Accountant Assistant PRO running on port ${PORT}`)
+  console.log(`🟢 Budget Assistant running on port ${PORT}`)
 );
