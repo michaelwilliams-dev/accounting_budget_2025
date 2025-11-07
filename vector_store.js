@@ -106,3 +106,4 @@ function dotProduct(a, b) {
   return a.reduce((sum, val, i) => sum + val * b[i], 0);
 }
 
+
