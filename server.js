@@ -24,7 +24,9 @@ app.options("*", cors());
 // Allow assistants.aivs.uk (any subdomain) and the backend itself for internal requests
 const allowedDomains = [
   "assistants.aivs.uk",
-  "budget-assistant.onrender.com"
+  "accounting-budget-2025.onrender.com",   // ✅ your Render service
+  "budget-assistant.onrender.com",         // keep for future reuse
+  "localhost"                              // allows local testing
 ];
 
 function verifyOrigin(req, res, next) {
