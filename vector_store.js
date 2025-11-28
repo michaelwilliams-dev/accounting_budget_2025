@@ -1,51 +1,43 @@
-// vector_store.js — Budget Assistant FAISS Loader
-// ISO Timestamp: 2025-10-13T11:15:00Z
+// vector_store.js — Budget Assistant (pure JS vector search)
+// ISO Timestamp: 2025-11-28
 
-import path from "path";
 import fs from "fs";
-import faiss from "faiss-node";
+import path from "path";
 import { OpenAI } from "openai";
 
 const ROOT_DIR = path.resolve();
 
-// Your Budget 2025 FAISS paths (NOT accountant paths)
-const INDEX_FILE = path.join(ROOT_DIR, "budget_demo_2025.index");
-const META_FILE  = path.join(ROOT_DIR, "budget_demo_2025.json");
+// Budget 2025 JSON index (same format as 2024)
+const META_FILE = path.join(ROOT_DIR, "budget_demo_2025.json");
 
-console.log("🟢 vector_store.js (Budget) using FAISS:", INDEX_FILE);
+console.log("🟢 vector_store.js using JSON index:", META_FILE);
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-/* ------------------ LOAD FAISS BINARY INDEX ------------------ */
+// ------------------------------------------------------------
+// LOAD JSON INDEX (text + embedding)
+// ------------------------------------------------------------
 export async function loadIndex() {
   try {
-    const index = faiss.readIndex(INDEX_FILE);
-    console.log(`✅ Loaded FAISS index (${index.ntotal} vectors)`);
-    return index;
-  } catch (err) {
-    console.error("❌ Failed to load FAISS index:", err.message);
-    return null;
-  }
-}
-
-/* ---------------------- LOAD METADATA ------------------------- */
-export async function loadMetadata() {
-  try {
     const raw = await fs.promises.readFile(META_FILE, "utf8");
-    const meta = JSON.parse(raw);
-    console.log(`📘 Loaded metadata (${meta.length} chunks)`);
-    return meta;
+    const data = JSON.parse(raw);
+    console.log(`✅ Loaded ${data.length} embedded chunks.`);
+    return data;
   } catch (err) {
-    console.error("❌ Failed to load metadata:", err.message);
+    console.error("❌ Failed to load index:", err.message);
     return [];
   }
 }
 
-/* ------------------ SEARCH (FAISS + OpenAI) -------------------- */
-export async function searchIndex(query, meta, index) {
+// ------------------------------------------------------------
+// SEARCH (OpenAI embedding + dot product)
+// ------------------------------------------------------------
+export async function searchIndex(query, index) {
   if (!query || query.length < 3) return [];
+
+  console.log("🔍 Query:", query);
 
   const emb = await openai.embeddings.create({
     model: "text-embedding-3-small",
@@ -53,18 +45,19 @@ export async function searchIndex(query, meta, index) {
   });
 
   const q = emb.data[0].embedding;
-  const [distances, ids] = index.search(q, 20);
 
-  const results = [];
-  for (let i = 0; i < ids.length; i++) {
-    const id = ids[i];
-    if (id < 0) continue;
+  const results = index.map(obj => ({
+    ...obj,
+    score: dotProduct(q, obj.embedding)
+  }));
 
-    results.push({
-      ...meta[id],
-      score: 1 - distances[i],
-    });
-  }
+  return results.sort((a, b) => b.score - a.score).slice(0, 20);
+}
 
-  return results.sort((a, b) => b.score - a.score);
+// ------------------------------------------------------------
+// DOT PRODUCT
+// ------------------------------------------------------------
+function dotProduct(a, b) {
+  if (!a || !b || a.length !== b.length) return 0;
+  return a.reduce((sum, v, i) => sum + v * b[i], 0);
 }
