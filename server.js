@@ -93,7 +93,7 @@ async function queryFaissIndex(question) {
 }
 
 /* ----------------------- Report Generator ----------------------------- */
-async function generateAccountantReport(query) {
+async function generateBudget2025Report(query) {
   const { joined, count } = await queryFaissIndex(query);
   let context = joined;
   if (context.length > 50000) context = context.slice(0, 50000);
@@ -258,7 +258,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
 
   try {
     const ts = new Date().toISOString();
-    const reportText = await generateAccountantReport(question);
+    const reportText = await generateBudget2025Report(question);
     const pdfBuf = await buildPdfBufferStructured({
       fullName: email,
       ts,
