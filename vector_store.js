@@ -1,109 +1,70 @@
-// vector_store.js
-// ISO Timestamp: 🕒 2025-10-13T11:15:00Z
-// Fully reverted to the stable 2024 Accountant PRO behaviour.
+// vector_store.js — Budget Assistant FAISS Loader
+// ISO Timestamp: 2025-10-13T11:15:00Z
 
+import path from "path";
 import fs from "fs";
+import faiss from "faiss-node";
 import { OpenAI } from "openai";
 
-const INDEX_PATH = "/opt/render/project/src/budget_demo_2025.index";
-const META_PATH  = "/opt/render/project/src/budget_demo_2025.json";
-const CHUNK_LIMIT = 50000;
+const ROOT_DIR = path.resolve();
 
-console.log("🟢 vector_store.js (chunk-safe) using", INDEX_PATH);
+// Your Budget 2025 FAISS paths (NOT accountant paths)
+const INDEX_FILE = path.join(ROOT_DIR, "budget_demo_2025.index");
+const META_FILE  = path.join(ROOT_DIR, "budget_demo_2025.json");
+
+console.log("🟢 vector_store.js (Budget) using FAISS:", INDEX_FILE);
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_APIKEY || process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY
 });
 
-// ----------------------------------------------------------------------
-//  CHUNKED LOAD — reads small batches of vectors
-// ----------------------------------------------------------------------
-export async function loadIndex(limit = CHUNK_LIMIT) {
-  console.log(`📦 Loading vector index in chunks (limit ${limit})...`);
-  const fd = await fs.promises.open(INDEX_PATH, "r");
-  const stream = fd.createReadStream({ encoding: "utf8" });
-
-  let buffer = "";
-  const vectors = [];
-  let processed = 0;
-
-  for await (const chunk of stream) {
-    buffer += chunk;
-    const parts = buffer.split("},");
-    buffer = parts.pop();
-
-    for (const p of parts) {
-      if (p.includes('"embedding"')) {
-        try {
-          const obj = JSON.parse(p.endsWith("}") ? p : p + "}");
-          vectors.push(obj);
-          processed++;
-
-          if (processed % 1000 === 0)
-            console.log(`  → ${processed} vectors`);
-
-          if (vectors.length >= limit) {
-            console.log(`🛑 Chunk limit reached (${limit})`);
-            await fd.close();
-            return vectors;
-          }
-        } catch {
-          // ignore malformed slices
-        }
-      }
-    }
+/* ------------------ LOAD FAISS BINARY INDEX ------------------ */
+export async function loadIndex() {
+  try {
+    const index = faiss.readIndex(INDEX_FILE);
+    console.log(`✅ Loaded FAISS index (${index.ntotal} vectors)`);
+    return index;
+  } catch (err) {
+    console.error("❌ Failed to load FAISS index:", err.message);
+    return null;
   }
-
-  await fd.close();
-  console.log(`✅ Loaded ${vectors.length} vectors (chunk-safe).`);
-  return vectors;
 }
 
-// ----------------------------------------------------------------------
-//  LOAD METADATA (OPTIONAL)
-// ----------------------------------------------------------------------
-export async function loadMetadata(limit = 10) {
+/* ---------------------- LOAD METADATA ------------------------- */
+export async function loadMetadata() {
   try {
-    const text = await fs.promises.readFile(META_PATH, "utf8");
-    const lines = text.trim().split("\n");
-    const sample = lines.slice(0, limit).map(l => JSON.parse(l));
-    console.log(`📘 Metadata sample loaded (${sample.length}/${lines.length})`);
-    return sample;
+    const raw = await fs.promises.readFile(META_FILE, "utf8");
+    const meta = JSON.parse(raw);
+    console.log(`📘 Loaded metadata (${meta.length} chunks)`);
+    return meta;
   } catch (err) {
-    console.warn("⚠️ Metadata file missing:", META_PATH, err.message);
+    console.error("❌ Failed to load metadata:", err.message);
     return [];
   }
 }
 
-// ----------------------------------------------------------------------
-//  SEARCH INDEX — returns original metadata + score
-// ----------------------------------------------------------------------
-export async function searchIndex(rawQuery, index) {
-  const query = String(rawQuery || "").trim();
-  if (query.length < 3) return [];
+/* ------------------ SEARCH (FAISS + OpenAI) -------------------- */
+export async function searchIndex(query, meta, index) {
+  if (!query || query.length < 3) return [];
 
-  console.log("🔍 [AIVS Search] Query:", query);
-
-  const response = await openai.embeddings.create({
+  const emb = await openai.embeddings.create({
     model: "text-embedding-3-small",
     input: [query],
   });
 
-  const q = response.data[0].embedding;
+  const q = emb.data[0].embedding;
+  const [distances, ids] = index.search(q, 20);
 
-  return index
-    .map(v => ({
-      ...v,
-      score: dotProduct(q, v.embedding),
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 10);
-}
+  const results = [];
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    if (id < 0) continue;
 
-// ----------------------------------------------------------------------
-//  DOT PRODUCT
-// ----------------------------------------------------------------------
-function dotProduct(a, b) {
-  if (!a || !b || a.length !== b.length) return 0;
-  return a.reduce((sum, val, i) => sum + val * b[i], 0);
+    results.push({
+      ...meta[id],
+      score: 1 - distances[i],
+    });
+  }
+
+  return results.sort((a, b) => b.score - a.score);
 }
