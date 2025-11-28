@@ -185,7 +185,7 @@ function sanitizeForPdf(txt = "") {
   return String(txt).replace(/[^\x09\x0A\x0D\x20-\x7E£–—]/g, "").trim();
 }
 
- buildPdfBufferStructured({ fullName, ts, question, reportText }) {
+async function buildPdfBufferStructured({ fullName, ts, question, reportText }) {
   const pdfDoc = await PDFDocument.create();
   let page = pdfDoc.addPage();
   let { width, height } = page.getSize();
@@ -245,6 +245,7 @@ function sanitizeForPdf(txt = "") {
   console.log(`📦 Created structured PDF (${bytes.length} bytes)`);
   return Buffer.from(bytes);
 }
+
 
 /* ------------------------------ /ask ---------------------------------- */
 
