@@ -1,16 +1,13 @@
 // vector_store.js
 // ISO Timestamp: 🕒 2025-10-13T11:15:00Z
-// CHANGELOG:
-// • Loads vector.index incrementally in small chunks (avoids RangeError)
-// • Fully compatible with Accountant PRO backend
-// • Keeps same metadata + search functions
+// Fully reverted to the stable 2024 Accountant PRO behaviour.
 
 import fs from "fs";
 import { OpenAI } from "openai";
 
 const INDEX_PATH = "/mnt/data/vector.index";
 const META_PATH  = "/mnt/data/chunks_metadata.final.jsonl";
-const CHUNK_LIMIT = 50000; // number of vectors per load batch
+const CHUNK_LIMIT = 50000;
 
 console.log("🟢 vector_store.js (chunk-safe) using", INDEX_PATH);
 
@@ -26,7 +23,6 @@ export async function loadIndex(limit = CHUNK_LIMIT) {
   const fd = await fs.promises.open(INDEX_PATH, "r");
   const stream = fd.createReadStream({ encoding: "utf8" });
 
-  const decoder = new TextDecoder();
   let buffer = "";
   const vectors = [];
   let processed = 0;
@@ -34,20 +30,26 @@ export async function loadIndex(limit = CHUNK_LIMIT) {
   for await (const chunk of stream) {
     buffer += chunk;
     const parts = buffer.split("},");
-    buffer = parts.pop(); // carry over incomplete line
+    buffer = parts.pop();
+
     for (const p of parts) {
       if (p.includes('"embedding"')) {
         try {
           const obj = JSON.parse(p.endsWith("}") ? p : p + "}");
           vectors.push(obj);
           processed++;
-          if (processed % 1000 === 0) console.log(`  → ${processed} vectors`);
+
+          if (processed % 1000 === 0)
+            console.log(`  → ${processed} vectors`);
+
           if (vectors.length >= limit) {
             console.log(`🛑 Chunk limit reached (${limit})`);
             await fd.close();
             return vectors;
           }
-        } catch { /* ignore bad slice */ }
+        } catch {
+          // ignore malformed slices
+        }
       }
     }
   }
@@ -74,66 +76,28 @@ export async function loadMetadata(limit = 10) {
 }
 
 // ----------------------------------------------------------------------
-//  SEARCH INDEX (semantic retrieval)
+//  SEARCH INDEX — returns original metadata + score
 // ----------------------------------------------------------------------
 export async function searchIndex(rawQuery, index) {
-  const query = (typeof rawQuery === "string" ? rawQuery : String(rawQuery || "")).trim();
-  if (!query || query.length < 3) {
-    console.warn("⚠️ Query too short or invalid:", query);
-    return [];
-  }
+  const query = String(rawQuery || "").trim();
+  if (query.length < 3) return [];
 
   console.log("🔍 [AIVS Search] Query:", query);
+
   const response = await openai.embeddings.create({
     model: "text-embedding-3-small",
     input: [query],
   });
 
   const q = response.data[0].embedding;
-  const scores = index.map(v => ({
-    ...v,
-    score: dotProduct(q, v.embedding),
-  }));
 
-  return scores.sort((a, b) => b.score - a.score).slice(0, 10);
-}
-
-// ----------------------------------------------------------------------
-//  DOT PRODUCT
-// ----------------------------------------------------------------------
-function dotProduct(a, b) {
-  if (!a || !b || a.length !== b.length) return 0;
-  return a.reduce((sum, val, i) => sum + val * b[i], 0);
-}
-  } catch (err) {
-    console.warn("⚠️ Metadata file missing:", META_FILE, err.message);  // FIXED
-    return [];
-  }
-}
-
-// ----------------------------------------------------------------------
-//  SEARCH INDEX (semantic retrieval)
-// ----------------------------------------------------------------------
-export async function searchIndex(rawQuery, index) {
-  const query = (typeof rawQuery === "string" ? rawQuery : String(rawQuery || "")).trim();
-  if (!query || query.length < 3) {
-    console.warn("⚠️ Query too short or invalid:", query);
-    return [];
-  }
-
-  console.log("🔍 [AIVS Search] Query:", query);
-  const response = await openai.embeddings.create({
-    model: "text-embedding-3-small",
-    input: [query],
-  });
-
-  const q = response.data[0].embedding;
-  const scores = index.map(v => ({
-    ...v,
-    score: dotProduct(q, v.embedding),
-  }));
-
-  return scores.sort((a, b) => b.score - a.score).slice(0, 10);
+  return index
+    .map(v => ({
+      ...v,
+      score: dotProduct(q, v.embedding),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
 }
 
 // ----------------------------------------------------------------------
