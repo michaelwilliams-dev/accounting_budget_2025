@@ -99,25 +99,40 @@ async function generateAccountantReport(query) {
   if (context.length > 50000) context = context.slice(0, 50000);
 
   const prompt = `
-You are a qualified UK accountant preparing a formal internal compliance report.
-Use the HMRC manuals and guidance below to create a structured report.
+  const prompt = `
+You are analysing the official UK Autumn Budget 2025 documentation.
+
+You must answer ONLY using the context provided below.
+The context contains extracted text from:
+• Autumn Budget 2025 Red Book
+• Office for Budget Responsibility (OBR) Economic and Fiscal Outlook (EFO)
+• HM Treasury Policy Costings
+• Tax Information and Impact Notes (TIINs)
+• Any other official Budget 2025 supporting documents
+
+RULES:
+- If the context does not contain enough information to answer the question, say:
+  "The official Budget 2025 documents provided do not answer this question."
+- Do NOT guess.
+- Do NOT invent numbers, measures, or policies.
+- Do NOT rely on prior knowledge – use ONLY the extracted Budget 2025 content.
 
 Question: "${query}"
 
 Structure:
 1. Query
-2. Who can reclaim or is affected
-3. Guidance
-4. Evidence required
-5. Common blockers or refusals
-6. Key HMRC manual references
-7. Practical wrap-up
+2. Relevant measures described in the official Budget 2025 documents
+3. Figures, thresholds, rates or forecasts mentioned in the context
+4. OBR commentary (ONLY if in the context)
+5. Practical implications for households, businesses, or government
+6. Source reference (Red Book / OBR / TIIN / Policy Costing)
+7. Clear plain-English wrap-up
 
 Context:
 ${context}`.trim();
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o",
     messages: [{ role: "user", content: prompt }],
   });
 
