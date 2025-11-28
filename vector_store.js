@@ -5,8 +5,11 @@
 // • Fully compatible with Accountant PRO backend
 // • Keeps same metadata + search functions
 
+import path from "path";
 import fs from "fs";
 import { OpenAI } from "openai";
+
+const ROOT_DIR = path.resolve();
 
 const INDEX_FILE = path.join(ROOT_DIR, "budget_demo_2025.index");
 const META_FILE  = path.join(ROOT_DIR, "budget_demo_2025.json");
