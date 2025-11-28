@@ -15,7 +15,7 @@ const INDEX_FILE = path.join(ROOT_DIR, "budget_demo_2025.index");
 const META_FILE  = path.join(ROOT_DIR, "budget_demo_2025.json");
 const CHUNK_LIMIT = 50000; // number of vectors per load batch
 
-console.log("🟢 vector_store.js (chunk-safe) using", INDEX_PATH);
+console.log("🟢 vector_store.js (chunk-safe) using", INDEX_FILE);
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_APIKEY || process.env.OPENAI_API_KEY,
@@ -26,7 +26,7 @@ const openai = new OpenAI({
 // ----------------------------------------------------------------------
 export async function loadIndex(limit = CHUNK_LIMIT) {
   console.log(`📦 Loading vector index in chunks (limit ${limit})...`);
-  const fd = await fs.promises.open(INDEX_PATH, "r");
+  const fd = await fs.promises.open(INDEX_FILE, "r");  // FIXED
   const stream = fd.createReadStream({ encoding: "utf8" });
 
   const decoder = new TextDecoder();
@@ -65,13 +65,13 @@ export async function loadIndex(limit = CHUNK_LIMIT) {
 // ----------------------------------------------------------------------
 export async function loadMetadata(limit = 10) {
   try {
-    const text = await fs.promises.readFile(META_PATH, "utf8");
+    const text = await fs.promises.readFile(META_FILE, "utf8");   // FIXED
     const lines = text.trim().split("\n");
     const sample = lines.slice(0, limit).map(l => JSON.parse(l));
     console.log(`📘 Metadata sample loaded (${sample.length}/${lines.length})`);
     return sample;
   } catch (err) {
-    console.warn("⚠️ Metadata file missing:", META_PATH, err.message);
+    console.warn("⚠️ Metadata file missing:", META_FILE, err.message);  // FIXED
     return [];
   }
 }
@@ -108,5 +108,3 @@ function dotProduct(a, b) {
   if (!a || !b || a.length !== b.length) return 0;
   return a.reduce((sum, val, i) => sum + val * b[i], 0);
 }
-
-
