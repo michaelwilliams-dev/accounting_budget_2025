@@ -1,4 +1,4 @@
-// server.js — Accountant Assistant PRO (pure-JS version)
+// server.js — Budget 2025 Assistant (pure-JS version)
 // ISO Timestamp: 🕒 2025-10-15T02:10:00Z
 // ✅ Added FAISS chunk count to footer (PDF + Word) — no other changes
 
@@ -99,7 +99,6 @@ async function generateAccountantReport(query) {
   if (context.length > 50000) context = context.slice(0, 50000);
 
   const prompt = `
-  const prompt = `
 You are analysing the official UK Autumn Budget 2025 documentation.
 
 You must answer ONLY using the context provided below.
@@ -186,7 +185,7 @@ function sanitizeForPdf(txt = "") {
   return String(txt).replace(/[^\x09\x0A\x0D\x20-\x7E£–—]/g, "").trim();
 }
 
-async function buildPdfBufferStructured({ fullName, ts, question, reportText }) {
+ buildPdfBufferStructured({ fullName, ts, question, reportText }) {
   const pdfDoc = await PDFDocument.create();
   let page = pdfDoc.addPage();
   let { width, height } = page.getSize();
@@ -234,7 +233,7 @@ async function buildPdfBufferStructured({ fullName, ts, question, reportText }) 
     }
   };
 
-  draw("Accountant Assistant PRO Report", margin, y, fsTitle, fontBold);
+  draw("Budget 2025 Report", margin, y, fsTitle, fontBold);
   y -= fsTitle * 1.4;
   para(`Prepared for: ${fullName || "N/A"}`, margin);
   para(`Timestamp (UK): ${ts}`, margin);
@@ -272,7 +271,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
       new Paragraph({
         children: [
           new TextRun({
-            text: "ACCOUNTANT ASSISTANT PRO REPORT",
+            text: "BUDGET 2025 ASSISTANT REPORT",
             bold: true,
             size: 32,
           }),
@@ -364,7 +363,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
     const regRand = `${dateSeed}-${randomPart}`;
 
     const footerText = `
-This report was prepared using the AIVS FAISS-indexed HMRC knowledge base,
+This report was prepared using the AIVS Budget 2025 knowledge base,
 derived entirely from verified UK Government publications and official manuals.
 It is provided for internal compliance and advisory purposes only and should not
 be relied upon as a substitute for professional accounting or tax advice.
@@ -406,7 +405,7 @@ Reg. No. AIVS/UK/${regRand}/${globalIndex ? globalIndex.length : 0}
                 { Email: managerEmail },
                 { Email: clientEmail },
               ].filter((r) => r.Email),
-              Subject: "Your AI Accountant Report",
+              Subject: "Budget 2025 Report",
               TextPart: reportText,
               HTMLPart: reportText
                 .split("\n")
@@ -443,9 +442,9 @@ Reg. No. AIVS/UK/${regRand}/${globalIndex ? globalIndex.length : 0}
 });
 
 app.get("/", (req, res) =>
-  res.sendFile(path.join(__dirname, "public", "accountant.html"))
+  res.sendFile(path.join(__dirname, "public", "budget.html"))
 );
 
 app.listen(Number(PORT), "0.0.0.0", () =>
-  console.log(`🟢 Accountant Assistant PRO running on port ${PORT}`)
+  console.log(`🟢Budget 2025 Assistant running on port ${PORT}`)
 );
