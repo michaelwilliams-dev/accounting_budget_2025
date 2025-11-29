@@ -3,7 +3,7 @@
 
 import fs from "fs";
 import path from "path";
-import { OpenAI } from "openai";
+import { SentenceTransformer } from "sentence-transformers";
 
 const ROOT_DIR = path.resolve();
 
@@ -12,9 +12,8 @@ const META_FILE = path.join(ROOT_DIR, "budget_demo_2025.json");
 
 console.log("🟢 vector_store.js using JSON index:", META_FILE);
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// 🔥 Use the SAME MiniLM model as embedding script
+const model = new SentenceTransformer("all-MiniLM-L6-v2");
 
 // ------------------------------------------------------------
 // LOAD JSON INDEX (text + embedding)
@@ -32,22 +31,18 @@ export async function loadIndex() {
 }
 
 // ------------------------------------------------------------
-// SEARCH (OpenAI embedding + dot product)
+// SEARCH (local MiniLM embedding + dot product)
 // ------------------------------------------------------------
 export async function searchIndex(query, index) {
   if (!query || query.length < 3) return [];
 
   console.log("🔍 Query:", query);
 
-  const emb = await openai.embeddings.create({
-    model: "all-MiniLM-L6-v2",
-    input: [query],
-  });
-
-  const q = emb.data[0].embedding;
+  // 🔥 FIX: local embedding, NOT OpenAI API
+  const q = await model.encode(query, { convertToFloat32: true });
 
   const results = index.map(obj => ({
-    ...obj,                    // 🔥 FIX: keep .text so queryFaissIndex() works
+    ...obj,
     score: dotProduct(q, obj.embedding)
   }));
 
