@@ -1,55 +1,83 @@
-// vector_store.js — Stable Budget Assistant Version
-// Zero FAISS. Zero external models. Pure keyword search.
-// This is the SAME method your Accounting Assistant uses.
 
-import fs from "fs";
+// server.js — Budget 2025 Assistant (stable, crash-proof)
+// ISO Timestamp: 2025-11-28T20:00:00Z
+
+import express from "express";
+import bodyParser from "body-parser";
+import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import cors from "cors";
+import fetch from "node-fetch";
+
+import { loadIndex, searchIndex } from "./vector_store.js";
+
+dotenv.config();
+
+const app = express();
+app.use(cors());
+app.options("*", cors());
+app.use(bodyParser.json());
+
+const PORT = process.env.PORT || 10000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// IMPORTANT — JSON must be in the same folder as server.js on Render
-const JSON_PATH = path.join(__dirname, "budget_demo_2025.json");
+app.use(express.static(path.join(__dirname, "public")));
 
-/* ---------------------- Load JSON Index ---------------------- */
-export async function loadIndex() {
-  console.log("📦 Loading Budget 2025 JSON...");
+/* --------------------- Load JSON Index ----------------------- */
+let GLOBAL_INDEX = [];
 
-  if (!fs.existsSync(JSON_PATH)) {
-    throw new Error(`JSON index file missing at: ${JSON_PATH}`);
+(async () => {
+  try {
+    console.log("📦 Loading Budget 2025 JSON Index...");
+    GLOBAL_INDEX = await loadIndex();
+    console.log(`🟢 READY — ${GLOBAL_INDEX.length} chunks loaded.`);
+  } catch (err) {
+    console.error("❌ Failed to load index:", err);
+    process.exit(1);
   }
+})();
 
-  const raw = fs.readFileSync(JSON_PATH, "utf8");
-  const data = JSON.parse(raw);
+/* ----------------------- /ask route --------------------------- */
+app.post("/ask", async (req, res) => {
+  try {
+    const { question } = req.body || {};
+    if (!question) return res.status(400).json({ error: "Missing question" });
 
-  const entries = data.map((o, idx) => ({
-    id: idx,
-    text: o.text || "",
-    embedding: o.embedding || [] // not used but kept for compatibility
-  }));
+    const clean = String(question).trim();
 
-  console.log(`🟢 Index ready — ${entries.length} chunks loaded.`);
-  return entries;
-}
+    const results = await searchIndex(clean, GLOBAL_INDEX);
 
-/* ---------------------- Search Function ---------------------- */
-export async function searchIndex(query, entries) {
-  if (!entries || entries.length === 0) return [];
+    const context = results.map(r => r.text).join("\n\n");
 
-  const q = String(query).toLowerCase();
-  const words = q.split(/\W+/).filter(w => w.length > 2);
+    if (!context) {
+      return res.json({
+        answer: "No matching content found in the Budget 2025 documents.",
+        contextCount: 0
+      });
+    }
 
-  return entries
-    .map(e => {
-      const t = e.text.toLowerCase();
-      let score = 0;
-      for (const w of words) {
-        if (t.includes(w)) score += 1;
-      }
-      return { ...e, score };
-    })
-    .filter(r => r.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 40);
-}
+    const response = {
+      answer: context.slice(0, 5000),
+      contextCount: results.length
+    };
+
+    return res.json(response);
+
+  } catch (err) {
+    console.error("❌ /ask failed:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/* ---------------------- Root route ---------------------------- */
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "budget.html"));
+});
+
+/* --------------------- Start server --------------------------- */
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🟢 Budget Assistant running on port ${PORT}`);
+});
