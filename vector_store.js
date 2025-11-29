@@ -1,82 +1,57 @@
-// vector_store.js — Budget 2025 Assistant (Pure Semantic FAISS Search)
+// vector_store.js — Budget 2025 Assistant (Cosine Semantic Search)
 // ISO Timestamp: 2025-11-28
 
 import fs from "fs";
 import path from "path";
-import faiss from "faiss-node";
 import { SentenceTransformer } from "sentence-transformers";
 
 const ROOT_DIR = path.resolve();
 const META_FILE = path.join(ROOT_DIR, "budget_demo_2025.json");
-const INDEX_FILE = path.join(ROOT_DIR, "budget_demo_2025.index");
 
-console.log("🟢 vector_store.js using:", META_FILE);
+console.log("🟢 vector_store.js loading:", META_FILE);
 
-let embeddings = [];
-let meta = [];
-let faissIndex = null;
-
+let indexData = null;
 const model = new SentenceTransformer("all-MiniLM-L6-v2");
 
-// --------------------- Load JSON metadata ---------------------
+// ---------------------- Load JSON -------------------------
 export async function loadIndex() {
-  if (meta.length > 0) return meta;
+  if (indexData) return indexData;
 
   try {
     const raw = await fs.promises.readFile(META_FILE, "utf8");
-    meta = JSON.parse(raw);
-    console.log(`✅ Loaded ${meta.length} chunks (metadata)`);
-    return meta;
+    indexData = JSON.parse(raw);
+    console.log(`✅ Loaded ${indexData.length} chunks with embeddings`);
+    return indexData;
   } catch (err) {
-    console.error("❌ Failed to load metadata:", err.message);
+    console.error("❌ Failed to load embeddings JSON:", err.message);
     return [];
   }
 }
 
-// --------------------- Load FAISS index ------------------------
-async function loadFaissIndex() {
-  if (faissIndex) return faissIndex;
-  try {
-    faissIndex = faiss.readIndex(INDEX_FILE);
-    console.log("🟢 FAISS index loaded (semantic search enabled)");
-    return faissIndex;
-  } catch (err) {
-    console.error("❌ Failed to load FAISS index:", err.message);
-    return null;
+// ------------------- Cosine Similarity ---------------------
+function cosineSim(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
   }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-// --------------------- Pure Semantic Search --------------------
-export async function searchIndex(query, indexMeta) {
-  try {
-    if (!query || query.length < 3) return [];
+// ------------------- Pure Semantic Search ------------------
+export async function searchIndex(query, index) {
+  if (!query || query.length < 3) return [];
 
-    const faissIdx = await loadFaissIndex();
-    if (!faissIdx) return [];
+  const qEmbed = await model.encode(query, { convertToTensor: false });
+  const qArr = Array.from(qEmbed);
 
-    const qEmbedding = await model.encode(query, { convertToTensor: false });
-    const qFloat32 = new Float32Array(qEmbedding);
+  const scored = index.map((obj) => ({
+    ...obj,
+    score: cosineSim(qArr, obj.embedding)
+  }));
 
-    const k = 20; // number of semantic neighbours to pull
-    const result = faissIdx.search(qFloat32, k);
-    const { distances, labels } = result;
-
-    const results = [];
-
-    for (let i = 0; i < labels.length; i++) {
-      const id = labels[i];
-      if (id < 0) continue;
-
-      results.push({
-        ...indexMeta[id],
-        score: distances[i] // lower distance = better match (L2)
-      });
-    }
-
-    // sort by semantic similarity (ascending L2)
-    return results.sort((a, b) => a.score - b.score);
-  } catch (err) {
-    console.error("❌ Semantic search error:", err);
-    return [];
-  }
+  return scored
+    .sort((a, b) => b.score - a.score)   // higher cosine = better
+    .slice(0, 20);
 }
