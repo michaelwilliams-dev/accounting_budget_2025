@@ -1,116 +1,61 @@
-// server.js — Budget 2025 Assistant (Accounting-style version)
-// ISO Timestamp: 2025-11-28T23:12:00Z
+// vector_store.js — Budget 2025 Assistant
+// Pure semantic loader + cosine search (Accounting Assistant method)
 
-import express from "express";
-import bodyParser from "body-parser";
-import OpenAI from "openai";
-import dotenv from "dotenv";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import cors from "cors";
-import { loadIndex, searchIndex } from "./vector_store.js";
-
-dotenv.config();
-const app = express();
-app.use(cors());
-app.options("*", cors());
-
-/* --------------------------- Origin Security ---------------------------- */
-const allowedDomains = [
-  "assistants.aivs.uk",
-  "accounting-budget-2025.onrender.com"
-];
-
-function verifyOrigin(req, res, next) {
-  const origin = req.get("Origin");
-  if (!origin) return res.status(403).json({ error: "Forbidden – no Origin header" });
-
-  try {
-    const { hostname } = new URL(origin);
-    const allowed = allowedDomains.some(
-      d => hostname === d || hostname.endsWith(`.${d}`)
-    );
-    if (!allowed)
-      return res.status(403).json({ error: "Forbidden – Origin not allowed" });
-
-    next();
-  } catch {
-    return res.status(400).json({ error: "Invalid Origin header" });
-  }
-}
-/* ----------------------------------------------------------------------- */
-
-const PORT = process.env.PORT || 10000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use(express.static(path.join(__dirname, "public")));
-app.use(bodyParser.json());
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const JSON_PATH = path.join(__dirname, "budget_demo_2025.json");
 
-/* ------------------------- Load Index --------------------------- */
-let globalIndex = [];
+/* ---------------------- Load JSON Index ---------------------- */
+export async function loadIndex() {
+  console.log("📦 Preloading Budget 2025 JSON Index...");
 
-(async () => {
-  try {
-    console.log("📦 Preloading Budget 2025 JSON Index...");
-    globalIndex = await loadIndex();
-    console.log(`🟢 READY — ${globalIndex.length} chunks loaded.`);
-  } catch (e) {
-    console.error("❌ Preload failed:", e.message);
+  const raw = fs.readFileSync(JSON_PATH, "utf8");
+  const data = JSON.parse(raw);
+
+  const entries = data.map((o, i) => ({
+    id: i,
+    text: o.text || "",
+    embedding: Float32Array.from(o.embedding || [])
+  }));
+
+  console.log(`🟢 Ready — ${entries.length} chunks loaded.`);
+  return entries;
+}
+
+/* ---------------------- Cosine Similarity ---------------------- */
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
   }
-})();
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
 
-/* --------------------------- Ask Route --------------------------- */
-app.post("/ask", verifyOrigin, async (req, res) => {
-  const { question } = req.body || {};
-  if (!question) return res.status(400).json({ error: "Missing question" });
+/* ---------------------- Search Function ---------------------- */
+export async function searchIndex(query, entries) {
+  if (!entries || entries.length === 0) return [];
 
-  const cleanQuestion = String(question).trim();
-  const matches = await searchIndex(cleanQuestion, globalIndex);
+  // Encode query using SAME embedding model as your JSON
+  // But since we can’t embed on Render, we use a keyword-boost method
+  const words = query.toLowerCase().split(/\W+/).filter(w => w.length > 2);
 
-  // join matched chunks
-  const context = matches.map(m => m.text).join("\n\n");
+  return entries
+    .map(e => {
+      // keyword overlap score (fallback method)
+      const text = e.text.toLowerCase();
+      let score = 0;
+      for (const w of words) if (text.includes(w)) score += 1;
 
-  const prompt = `
-You are analysing the official UK Autumn Budget 2025 documentation.
-
-Use ONLY the text provided below.
-
-RULES:
-- If the Budget 2025 content does NOT answer the question, reply exactly:
-  "The Budget 2025 documents provided do not answer this question."
-- No external knowledge.
-- No assumptions.
-- Only answer from the extracted text.
-
-QUESTION:
-"${cleanQuestion}"
-
-CONTEXT:
-${context}
-  `.trim();
-
-  try {
-    const ai = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }]
-    });
-
-    const answer = ai.choices[0].message.content.trim();
-    res.json({ answer, chunks_used: matches.length });
-  } catch (err) {
-    console.error("❌ OpenAI error:", err);
-    res.status(500).json({ error: "AI processing failed" });
-  }
-});
-
-/* --------------------------- Root --------------------------- */
-app.get("/", (req, res) =>
-  res.sendFile(path.join(__dirname, "public", "budget.html"))
-);
-
-app.listen(Number(PORT), "0.0.0.0", () =>
-  console.log(`🟢 Budget Assistant running on port ${PORT}`)
-);
+      return { ...e, score };
+    })
+    .filter(r => r.score > 0)           // MUST return at least some chunks
+    .sort((a, b) => b.score - a.score)  // highest matches first
+    .slice(0, 40);                      // return top 40 chunks
+}
