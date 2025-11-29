@@ -44,5 +44,5 @@ export async function searchIndex(query, index) {
 
   return results
     .sort((a, b) => b.score - a.score)
-    .slice(0, 20);
+    .slice(0, 5);
 }
