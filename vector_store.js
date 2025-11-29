@@ -40,7 +40,7 @@ export async function searchIndex(query, index) {
   console.log("🔍 Query:", query);
 
   const emb = await openai.embeddings.create({
-    model: "text-embedding-3-small",
+    model: "all-MiniLM-L6-v2",
     input: [query],
   });
 
