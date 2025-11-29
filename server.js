@@ -34,7 +34,8 @@ function verifyOrigin(req, res, next) {
     const allowed = allowedDomains.some(
       (d) => hostname === d || hostname.endsWith(`.${d}`)
     );
-    if (!allowed) return res.status(403).json({ error: "Forbidden – Origin not allowed", origin });
+    if (!allowed)
+      return res.status(403).json({ error: "Forbidden – Origin not allowed", origin });
 
     next();
   } catch {
@@ -68,7 +69,7 @@ let globalIndex = null;
 async function queryFaissIndex(question) {
   try {
     const index = globalIndex || (await loadIndex());
-    const matches = await searchIndex(question, index);
+    const matches = await searchIndex(question, index);  // returns text + embeddings + score
     const filtered = matches.filter((m) => m.score >= 0.03);
     const texts = filtered.map((m) => m.text);
     console.log(`🔎 Found ${texts.length} chunks for “${question}”`);
@@ -108,7 +109,7 @@ Structure:
 1. Query
 2. Relevant Budget 2025 measures
 3. Key figures & thresholds mentioned
-4. OBR commentary 
+4. OBR commentary
 5. Practical implications
 6. Source references (Red Book, OBR, TIIN)
 7. Plain English wrap-up
@@ -195,17 +196,23 @@ app.post("/ask", verifyOrigin, async (req, res) => {
   const { question, email, managerEmail, clientEmail } = req.body || {};
   if (!question) return res.status(400).json({ error: "Missing question" });
 
+  // ⭐ FIX: clean question removes line breaks & weird spacing
+  const cleanQuestion = String(question).replace(/\s+/g, " ").trim();
+
   try {
     const ts = new Date().toISOString();
-    const reportText = await generateBudget2025Report(question);
+
+    // ⭐ FIX: correct generator + clean question
+    const reportText = await generateBudget2025Report(cleanQuestion);
+
     const pdfBuf = await buildPdfBufferStructured({
       fullName: email,
       ts,
-      question,
+      question: cleanQuestion,
       reportText,
     });
 
-    res.json({ question, answer: reportText, timestamp: ts });
+    res.json({ question: cleanQuestion, answer: reportText, timestamp: ts });
   } catch (err) {
     res.status(500).json({ error: "Report generation failed" });
   }
