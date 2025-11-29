@@ -47,7 +47,7 @@ export async function searchIndex(query, index) {
   const q = emb.data[0].embedding;
 
   const results = index.map(obj => ({
-    ...obj,
+    ...obj,                    // 🔥 FIX: keep .text so queryFaissIndex() works
     score: dotProduct(q, obj.embedding)
   }));
 
