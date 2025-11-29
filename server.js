@@ -108,7 +108,7 @@ Structure:
 1. Query
 2. Relevant Budget 2025 measures
 3. Key figures & thresholds mentioned
-4. OBR commentary (if present)
+4. OBR commentary 
 5. Practical implications
 6. Source references (Red Book, OBR, TIIN)
 7. Plain English wrap-up
