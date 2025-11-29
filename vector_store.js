@@ -1,67 +1,82 @@
-// vector_store.js — Budget Assistant (Semantic Search with OpenAI embeddings)
-// ISO Timestamp: 2025-11-29
+// vector_store.js — Budget 2025 Assistant (Pure Semantic FAISS Search)
+// ISO Timestamp: 2025-11-28
 
 import fs from "fs";
 import path from "path";
-import { OpenAI } from "openai";
+import faiss from "faiss-node";
+import { SentenceTransformer } from "sentence-transformers";
 
 const ROOT_DIR = path.resolve();
 const META_FILE = path.join(ROOT_DIR, "budget_demo_2025.json");
+const INDEX_FILE = path.join(ROOT_DIR, "budget_demo_2025.index");
 
-console.log("🟢 vector_store.js using JSON index:", META_FILE);
+console.log("🟢 vector_store.js using:", META_FILE);
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+let embeddings = [];
+let meta = [];
+let faissIndex = null;
 
-// ------------------------------------------------------------
-// LOAD JSON INDEX — contains text + OpenAI 1536-dim embeddings
-// ------------------------------------------------------------
+const model = new SentenceTransformer("all-MiniLM-L6-v2");
+
+// --------------------- Load JSON metadata ---------------------
 export async function loadIndex() {
+  if (meta.length > 0) return meta;
+
   try {
     const raw = await fs.promises.readFile(META_FILE, "utf8");
-    const data = JSON.parse(raw);
-    console.log(`✅ Loaded ${data.length} embedded chunks.`);
-    return data;
+    meta = JSON.parse(raw);
+    console.log(`✅ Loaded ${meta.length} chunks (metadata)`);
+    return meta;
   } catch (err) {
-    console.error("❌ Failed to load index:", err.message);
+    console.error("❌ Failed to load metadata:", err.message);
     return [];
   }
 }
 
-// ------------------------------------------------------------
-// SEMANTIC SEARCH — OpenAI embedding + dot product
-// MUST match the model used to create the embeddings
-// ------------------------------------------------------------
-export async function searchIndex(query, index) {
-  if (!query || query.length < 3) return [];
-
-  console.log("🔍 Query:", query);
-
-  // Generate query embedding using SAME model used in your JSON embeddings
-  const response = await openai.embeddings.create({
-    model: "text-embedding-3-small",  // ⭐ correct model for your existing vectors
-    input: query
-  });
-
-  const q = response.data[0].embedding;
-
-  // Dot-product scoring against your stored 1536-d vectors
-  const results = index.map(obj => ({
-    ...obj,
-    score: dotProduct(q, obj.embedding)
-  }));
-
-  // Return top 5 most relevant vectors
-  return results
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+// --------------------- Load FAISS index ------------------------
+async function loadFaissIndex() {
+  if (faissIndex) return faissIndex;
+  try {
+    faissIndex = faiss.readIndex(INDEX_FILE);
+    console.log("🟢 FAISS index loaded (semantic search enabled)");
+    return faissIndex;
+  } catch (err) {
+    console.error("❌ Failed to load FAISS index:", err.message);
+    return null;
+  }
 }
 
-// ------------------------------------------------------------
-// DOT PRODUCT — must match 1536-dim vectors
-// ------------------------------------------------------------
-function dotProduct(a, b) {
-  if (!a || !b || a.length !== b.length) return 0;
-  return a.reduce((sum, v, i) => sum + v * b[i], 0);
+// --------------------- Pure Semantic Search --------------------
+export async function searchIndex(query, indexMeta) {
+  try {
+    if (!query || query.length < 3) return [];
+
+    const faissIdx = await loadFaissIndex();
+    if (!faissIdx) return [];
+
+    const qEmbedding = await model.encode(query, { convertToTensor: false });
+    const qFloat32 = new Float32Array(qEmbedding);
+
+    const k = 20; // number of semantic neighbours to pull
+    const result = faissIdx.search(qFloat32, k);
+    const { distances, labels } = result;
+
+    const results = [];
+
+    for (let i = 0; i < labels.length; i++) {
+      const id = labels[i];
+      if (id < 0) continue;
+
+      results.push({
+        ...indexMeta[id],
+        score: distances[i] // lower distance = better match (L2)
+      });
+    }
+
+    // sort by semantic similarity (ascending L2)
+    return results.sort((a, b) => a.score - b.score);
+  } catch (err) {
+    console.error("❌ Semantic search error:", err);
+    return [];
+  }
 }
