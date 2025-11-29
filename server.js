@@ -32,10 +32,10 @@ function verifyOrigin(req, res, next) {
   try {
     const { hostname } = new URL(origin);
     const allowed = allowedDomains.some(
-      (d) => hostname === d || hostname.endsWith(`.${d}`)
+      d => hostname === d || hostname.endsWith(`.${d}`)
     );
     if (!allowed)
-      return res.status(403).json({ error: "Forbidden – Origin not allowed", origin });
+      return res.status(403).json({ error: "Forbidden – Origin not allowed" });
 
     next();
   } catch {
@@ -69,12 +69,14 @@ let globalIndex = null;
 async function queryFaissIndex(question) {
   try {
     const index = globalIndex || (await loadIndex());
-    const matches = await searchIndex(question, index);  // returns text + embeddings + score
-    const filtered = matches.filter((m) => m.score >= 0.03);
-    const texts = filtered.map((m) => m.text);
+    const matches = await searchIndex(question, index);
+    const filtered = matches.filter(m => m.score >= 0.03);
+    const texts = filtered.map(m => m.text);
+
     console.log(`🔎 Found ${texts.length} chunks for “${question}”`);
     return { joined: texts.join("\n\n"), count: filtered.length };
-  } catch {
+  } catch (err) {
+    console.error("❌ Search error:", err);
     return { joined: "", count: 0 };
   }
 }
@@ -83,7 +85,6 @@ async function queryFaissIndex(question) {
 async function generateBudget2025Report(query) {
   const { joined, count } = await queryFaissIndex(query);
   let context = joined;
-
   if (context.length > 50000) context = context.slice(0, 50000);
 
   const prompt = `
@@ -91,28 +92,27 @@ You are analysing the official UK Autumn Budget 2025 documentation.
 
 Use ONLY the extracted text provided below:
 • Autumn Budget 2025 Red Book
-• Office for Budget Responsibility (OBR) Economic & Fiscal Outlook (EFO)
+• OBR Economic & Fiscal Outlook (EFO)
 • HM Treasury Policy Costings
-• TIINs (Tax Information and Impact Notes)
-• Any other supporting Budget 2025 documents
+• TIINs
+• Any other supporting Budget 2025 docs
 
 RULES:
 - If the context does not contain enough information, reply:
   "The Budget 2025 documents provided do not answer this question."
-- Do NOT guess.
-- Do NOT invent policy.
-- Do NOT use prior knowledge beyond this context.
+- No guessing.
+- No external knowledge.
 
 Question: "${query}"
 
 Structure:
 1. Query
-2. Relevant Budget 2025 measures
-3. Key figures & thresholds mentioned
+2. Relevant measures
+3. Key figures
 4. OBR commentary
 5. Practical implications
-6. Source references (Red Book, OBR, TIIN)
-7. Plain English wrap-up
+6. Source references
+7. Summary
 
 Context:
 ${context}`.trim();
@@ -160,7 +160,6 @@ async function buildPdfBufferStructured({ fullName, ts, question, reportText }) 
     const words = String(txt).split(/\s+/);
     let cur = "";
     const rows = [];
-
     for (const w of words) {
       const test = cur ? `${cur} ${w}` : w;
       if (font.widthOfTextAtSize(test, size) > maxWidth && cur) {
@@ -182,8 +181,10 @@ async function buildPdfBufferStructured({ fullName, ts, question, reportText }) 
 
   draw("Budget 2025 Report", margin, y, fsTitle, fontBold);
   y -= fsTitle * 1.4;
+
   para(`Prepared for: ${fullName || "N/A"}`, margin);
   para(`Timestamp (UK): ${ts}`, margin);
+
   para(question, margin);
   para(reportText, margin);
 
@@ -196,13 +197,12 @@ app.post("/ask", verifyOrigin, async (req, res) => {
   const { question, email, managerEmail, clientEmail } = req.body || {};
   if (!question) return res.status(400).json({ error: "Missing question" });
 
-  // ⭐ FIX: clean question removes line breaks & weird spacing
+  // Clean input
   const cleanQuestion = String(question).replace(/\s+/g, " ").trim();
 
   try {
     const ts = new Date().toISOString();
 
-    // ⭐ FIX: correct generator + clean question
     const reportText = await generateBudget2025Report(cleanQuestion);
 
     const pdfBuf = await buildPdfBufferStructured({
@@ -214,6 +214,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
 
     res.json({ question: cleanQuestion, answer: reportText, timestamp: ts });
   } catch (err) {
+    console.error("❌ Report failed:", err);
     res.status(500).json({ error: "Report generation failed" });
   }
 });
