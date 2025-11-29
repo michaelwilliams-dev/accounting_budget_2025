@@ -20,6 +20,7 @@ app.use(cors());
 app.options("*", cors());
 
 /* --------------------------- Origin Security ---------------------------- */
+
 const allowedDomains = [
   "assistants.aivs.uk",
   "accounting-budget-2025.onrender.com"
@@ -27,7 +28,15 @@ const allowedDomains = [
 
 function verifyOrigin(req, res, next) {
   const origin = req.get("Origin");
-  if (!origin) return res.status(403).json({ error: "Forbidden – no Origin header" });
+
+  // Allow internal Render shell + localhost testing with no Origin
+  if (!origin && (req.hostname === "localhost" || req.hostname === "127.0.0.1")) {
+    return next();
+  }
+
+  if (!origin) {
+    return res.status(403).json({ error: "Forbidden – no Origin header" });
+  }
 
   try {
     const { hostname } = new URL(origin);
@@ -42,6 +51,7 @@ function verifyOrigin(req, res, next) {
     return res.status(400).json({ error: "Invalid Origin header" });
   }
 }
+
 /* ----------------------------------------------------------------------- */
 
 const PORT = process.env.PORT || 3002;
@@ -197,7 +207,6 @@ app.post("/ask", verifyOrigin, async (req, res) => {
   const { question, email, managerEmail, clientEmail } = req.body || {};
   if (!question) return res.status(400).json({ error: "Missing question" });
 
-  // Clean input
   const cleanQuestion = String(question).replace(/\s+/g, " ").trim();
 
   try {
