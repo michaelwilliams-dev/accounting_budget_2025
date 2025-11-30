@@ -133,7 +133,7 @@ async function generateHTMLReport(question) {
 
   /* --------------- MAIN REPORT VIA OPENAI ---------------- */
   const prompt = `
-You must answer ONLY using the context:
+You must answer ONLY using the context.
 Return CLEAN HTML only. Use this exact 11-section structure:
 
 <div class="report">
@@ -190,35 +190,30 @@ Context: ${context}
   return `<div class="aivs-html-output">${completion.choices[0].message.content}</div>`;
 }
 
-/* ---------------------------- /ASK WITH EMAIL + PDF + DOCX ---------------------------- */
+/* ---------------------------- /ASK (EMAIL + PDF + DOCX) ---------------------------- */
 app.post("/ask", verifyOrigin, async (req, res) => {
   const { question, email, managerEmail, clientEmail } = req.body;
   const cleanQuestion = String(question || "").trim();
   const isoNow = new Date().toISOString();
 
   try {
+    /* 1. Generate HTML */
     const html = await generateHTMLReport(cleanQuestion);
 
-    /* -------- PDF -------- */
+    /* 2. Generate PDF */
     const pdfDoc = await PDFDocument.create();
-    let page = pdfDoc.addPage([595, 842]);     // ← FIXED (let, not const)
+    let page = pdfDoc.addPage([595, 842]);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    page.drawText("AIVS Budget 2025 Report", {
-      x: 40, y: 780, size: 20, font: bold, color: rgb(0, 0, 0)
-    });
-    page.drawText(`ISO Timestamp: ${isoNow}`, {
-      x: 40, y: 760, size: 10, font
-    });
+    page.drawText("AIVS Budget 2025 Report", { x: 40, y: 800, size: 18 });
+    page.drawText(`ISO Timestamp: ${isoNow}`, { x: 40, y: 780, size: 10 });
 
-    let y = 730;
-    const plainText = html.replace(/<[^>]+>/g, "");
-
-    for (let line of plainText.split("\n")) {
+    let y = 760;
+    const plain = html.replace(/<[^>]+>/g, "");
+    for (let line of plain.split("\n")) {
       if (y < 60) {
         page = pdfDoc.addPage([595, 842]);
-        y = 780;
+        y = 800;
       }
       page.drawText(line, { x: 40, y, size: 11, font });
       y -= 16;
@@ -227,47 +222,31 @@ app.post("/ask", verifyOrigin, async (req, res) => {
     const pdfBytes = await pdfDoc.save();
     const pdfBase64 = Buffer.from(pdfBytes).toString("base64");
 
-    /* -------- DOCX -------- */
+    /* 3. Generate DOCX */
     const doc = new Document({
       sections: [
         {
           children: [
             new Paragraph({
-              children: [
-                new TextRun({
-                  text: "AIVS Budget 2025 Report",
-                  size: 36,
-                  bold: true,
-                  color: "4e65ac"
-                })
-              ]
+              children: [new TextRun({ text: "AIVS Budget 2025 Report", size: 36, bold: true })]
             }),
-            new Paragraph({
-              children: [new TextRun(`ISO Timestamp: ${isoNow}`)]
-            }),
-            ...plainText.split("\n").map(
-              (line) =>
-                new Paragraph({
-                  children: [new TextRun(line)],
-                  spacing: { after: 200 }
-                })
+            new Paragraph({ children: [new TextRun(`ISO Timestamp: ${isoNow}`)] }),
+            ...plain.split("\n").map(
+              line => new Paragraph({ children: [new TextRun(line)], spacing: { after: 200 } })
             )
           ]
         }
       ]
     });
 
-    const docxBuffer = await Packer.toBuffer(doc);
-    const docxBase64 = Buffer.from(docxBuffer).toString("base64");
+    const docxBytes = await Packer.toBuffer(doc);
+    const docxBase64 = Buffer.from(docxBytes).toString("base64");
 
-    /* -------- SEND EMAIL -------- */
+    /* 4. SEND EMAIL */
     const payload = {
       Messages: [
         {
-          From: {
-            Email: process.env.MJ_SENDER_EMAIL,
-            Name: "AIVS Budget Assistant"
-          },
+          From: { Email: process.env.MJ_SENDER_EMAIL, Name: "AIVS Budget Assistant" },
           To: [{ Email: email }],
           Cc: managerEmail ? [{ Email: managerEmail }] : [],
           Bcc: clientEmail ? [{ Email: clientEmail }] : [],
@@ -290,19 +269,21 @@ app.post("/ask", verifyOrigin, async (req, res) => {
       ]
     };
 
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": "AIVS-Budget-Assistant/1.0",
-      Authorization:
-        "Basic " +
-        Buffer.from(
-          process.env.MJ_APIKEY_PUBLIC + ":" + process.env.MJ_APIKEY_PRIVATE
-        ).toString("base64")
-    }
+    await fetch("https://api.mailjet.com/v3.1/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "AIVS-Budget-Assistant/1.0",
+        Authorization:
+          "Basic " +
+          Buffer.from(
+            process.env.MJ_APIKEY_PUBLIC + ":" + process.env.MJ_APIKEY_PRIVATE
+          ).toString("base64")
+      },
       body: JSON.stringify(payload)
     });
 
-    /* -------- FRONT END HTML RETURN -------- */
+    /* 5. Return HTML to frontend */
     res.json({ question: cleanQuestion, html });
 
   } catch (e) {
