@@ -1,16 +1,16 @@
 // public/script.js — Budget 2025 / Accountant Assistant Frontend
-// ISO Timestamp: 🕒 2025-11-29T12:30:00Z
+// ISO Timestamp: 🕒 2025-11-29T13:45:00Z
 // ✔ Correct output element (#response)
 // ✔ Correctly handles backend fields: html, answer, reportText
 // ✔ Removes false "No report returned" warnings
 
-console.log("CLIENT JS VERSION = v2025-11-29T12:30:00Z (Budget/Accountant Assistant)");
+console.log("CLIENT JS VERSION = v2025-11-29T13:45:00Z (Budget/Accountant Assistant)");
 
 document.addEventListener("DOMContentLoaded", () => {
   const $ = (id) => document.getElementById(id);
 
   const generateBtn = $("generate");
-  const output = $("response");  // ✅ FIXED: matches your HTML <div id="response">
+  const output = $("response");  // Correct container
 
   const emailInput = $("email");
   const managerInput = $("managerEmail");
@@ -69,12 +69,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       console.log("📥 [CLIENT /ask] Response:", data);
 
-      /* =============================================================
-         CORRECTED RESPONSE HANDLER
-         Supports backend fields: html, answer, reportText
-         ============================================================= */
+      // Corrected response handler
       if (data?.html) {
-        output.innerHTML = data.html;           // ✅ Budget Assistant format
+        output.innerHTML = data.html;           // Budget Assistant HTML output
       } else if (data?.answer) {
         output.innerHTML = data.answer;         // Legacy assistants
       } else if (data?.reportText) {
