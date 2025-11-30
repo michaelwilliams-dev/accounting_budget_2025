@@ -1,5 +1,5 @@
-// server.js — Budget 2025 Assistant (Full Email + PDF + DOCX Version)
-// ISO Timestamp: 2025-11-30T13:00:00Z
+// server.js — Budget 2025 Assistant (FINAL STABLE VERSION)
+// ISO Timestamp: 2025-11-30T15:20:00Z
 
 import express from "express";
 import bodyParser from "body-parser";
@@ -11,7 +11,7 @@ import cors from "cors";
 import fetch from "node-fetch";
 import { loadIndex, searchIndex } from "./vector_store.js";
 
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts } from "pdf-lib";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 
 dotenv.config();
@@ -23,7 +23,7 @@ app.options("*", cors());
 /* --------------------------- ORIGIN SECURITY ---------------------------- */
 const allowedDomains = [
   "assistants.aivs.uk",
-  "accounting-budget-2025.onrender.com"
+  "accounting-budget-2025.onrender.com",
 ];
 
 function verifyOrigin(req, res, next) {
@@ -32,7 +32,7 @@ function verifyOrigin(req, res, next) {
   try {
     const { hostname } = new URL(origin);
     const allowed = allowedDomains.some(
-      d => hostname === d || hostname.endsWith(`.${d}`)
+      (d) => hostname === d || hostname.endsWith(`.${d}`)
     );
     if (!allowed) return next();
   } catch {}
@@ -60,83 +60,97 @@ async function runSemanticSearch(question) {
   const index = globalIndex || (await loadIndex());
   const matches = await searchIndex(question, index);
 
-  const filtered = matches
-    .filter(m => m.score >= 0.03)
-    .slice(0, 4);
+  const filtered = matches.filter((m) => m.score >= 0.03).slice(0, 4);
 
   console.log(`🔎 Found ${filtered.length} chunks for "${question}"`);
 
   return {
-    context: filtered.map(m => m.text).join("\n\n"),
+    context: filtered.map((m) => m.text).join("\n\n"),
     count: filtered.length,
-    chunks: filtered
+    chunks: filtered,
   };
 }
 
 /* ---------------------------- REPORT BUILDER ---------------------------- */
 async function generateHTMLReport(question) {
   const { context, count, chunks } = await runSemanticSearch(question);
-  const savingClause = `
+
+  const saving = `
   <h2>11. Saving Clause</h2>
   <p style="font-size:0.9rem; color:#555;">
     This report has been generated automatically by AIVS Software Limited.
-    It is provided for internal guidance only and does <strong>not</strong> constitute
-    formal accounting, tax, financial, or legal advice.
-    All information must be independently verified against original records,
-    HMRC publications, and the relevant regulations before any decisions or filings are made.
+    It is provided for internal guidance only and does not constitute formal
+    accounting, tax, financial, or legal advice.
   </p>`;
 
   if (!count || !context.trim()) {
     return `
 <div class="report">
-  <h1>Budget 2025 Report</h1>
-  <h2>1. Query Restated</h2><p>${question}</p>
-  <h2>2. Relevant Budget 2025 Measures</h2><ul><li>No Budget measures found.</li></ul>
-  <h2>3. Key Figures</h2><ul><li>No figures available.</li></ul>
-  <h2>4. OBR Commentary</h2><p>None found.</p>
-  <h2>5. Practical Implications</h2><ul><li>No changes required.</li></ul>
-  <h2>6. Sources</h2><ul><li>No sources.</li></ul>
-  <h2>7. Summary</h2><p>No impact.</p>
-  <h2>8. Reason</h2><p>No changes in Budget.</p>
-  <h2>9. Current HMRC Rules</h2><ul><li>Existing rules apply.</li></ul>
-  <h2>10. Advisory Notes</h2><ul><li>Monitor future updates.</li></ul>
-  ${savingClause}
-</div>`.trim();
+<h1>Budget 2025 Report</h1>
+<h2>1. Query Restated</h2><p>${question}</p>
+<h2>2. Measures</h2><ul><li>No relevant measures in Budget 2025.</li></ul>
+<h2>3. Figures</h2><ul><li>No figures.</li></ul>
+<h2>4. OBR</h2><p>None.</p>
+<h2>5. Implications</h2><ul><li>No impact.</li></ul>
+<h2>6. References</h2><ul><li>No sources.</li></ul>
+<h2>7. Summary</h2><p>No change.</p>
+<h2>8. Reason</h2><p>No Budget changes in this area.</p>
+<h2>9. Current HMRC Rules</h2><ul><li>Existing rules apply.</li></ul>
+<h2>10. Advisory Notes</h2><ul><li>Monitor future updates.</li></ul>
+${saving}
+</div>
+`.trim();
   }
 
   const prompt = `
-You must answer ONLY using the context. Return CLEAN HTML ONLY.
+Return CLEAN HTML ONLY:
 
 <div class="report">
 
 <h1>Budget 2025 Report</h1>
 
-<h2>1. Query Restated</h2><p>[Restate]</p>
-<h2>2. Relevant Budget 2025 Measures</h2><ul><li>[Measures]</li></ul>
-<h2>3. Key Figures</h2><ul><li>[Figures]</li></ul>
-<h2>4. OBR Commentary</h2><p>[OBR]</p>
-<h2>5. Practical Implications</h2><ul><li>[Impact]</li></ul>
-<h2>6. Sources</h2><ul>
-${chunks.map(c => `<li>${c.file || "Unknown source"}</li>`).join("\n")}
-</ul>
-<h2>7. Summary</h2><p>[Wrap-up]</p>
-<h2>8. Reason</h2><p>If context limited, no Budget changes.</p>
-<h2>9. Current HMRC Rules</h2><ul><li>Existing rules apply.</li></ul>
-<h2>10. Advisory Notes</h2><ul><li>Monitor HMRC updates.</li></ul>
+<h2>1. Query Restated</h2><p>[restated]</p>
 
-${savingClause}
+<h2>2. Relevant Budget 2025 Measures</h2>
+<ul><li>[measures]</li></ul>
+
+<h2>3. Key Figures</h2>
+<ul><li>[figures]</li></ul>
+
+<h2>4. OBR Commentary</h2><p>[obr]</p>
+
+<h2>5. Practical Implications</h2>
+<ul><li>[impact]</li></ul>
+
+<h2>6. Source References</h2>
+<ul>
+${chunks.map((c) => `<li>${c.file || "Unknown"}</li>`).join("\n")}
+</ul>
+
+<h2>7. Summary</h2><p>[summary]</p>
+
+<h2>8. Reason</h2><p>If detail is limited, no Budget changes exist.</p>
+
+<h2>9. Current HMRC Rules</h2>
+<ul><li>Existing rules apply.</li></ul>
+
+<h2>10. Advisory Notes</h2>
+<ul><li>Monitor HMRC updates.</li></ul>
+
+${saving}
 
 </div>
 
 Context:
 ${context}
+
 Question: ${question}
 `.trim();
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }]
+    messages: [{ role: "user", content: prompt }],
   });
 
   return `<div class="aivs-html-output">${completion.choices[0].message.content}</div>`;
@@ -144,7 +158,10 @@ Question: ${question}
 
 /* ---------------------------- /ASK (EMAIL + PDF + DOCX) ---------------------------- */
 app.post("/ask", verifyOrigin, async (req, res) => {
-  const { question, email, managerEmail, clientEmail } = req.body;
+  const { question, email } = req.body;
+  const managerEmail = req.body.managerEmail || "";
+  const clientEmail = req.body.clientEmail || "";
+
   const cleanQuestion = String(question || "").trim();
   const isoNow = new Date().toISOString();
 
@@ -164,14 +181,13 @@ app.post("/ask", verifyOrigin, async (req, res) => {
     for (let line of plain.split("\n")) {
       if (y < 60) {
         page = pdfDoc.addPage([595, 842]);
-        y = 800;
+        y = 780;
       }
       page.drawText(line, { x: 40, y, size: 11, font });
       y -= 16;
     }
 
-    const pdfBytes = await pdfDoc.save();
-    const pdfBase64 = Buffer.from(pdfBytes).toString("base64");
+    const pdfBase64 = Buffer.from(await pdfDoc.save()).toString("base64");
 
     /* -------- DOCX -------- */
     const doc = new Document({
@@ -184,49 +200,42 @@ app.post("/ask", verifyOrigin, async (req, res) => {
                   text: "AIVS Budget 2025 Report",
                   bold: true,
                   size: 36,
-                  color: "4e65ac"
-                })
+                }),
               ],
-              spacing: { after: 300 }
             }),
-    
             new Paragraph({
               children: [
                 new TextRun({
                   text: `ISO Timestamp: ${isoNow}`,
                   size: 20,
-                  color: "555555"
-                })
+                  color: "555555",
+                }),
               ],
-              spacing: { after: 300 }
             }),
-    
             ...plain.split("\n").map(
               (line) =>
                 new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: line,
-                      size: 24
-                    })
-                  ],
-                  spacing: { after: 200 }
+                  children: [new TextRun({ text: line, size: 24 })],
+                  spacing: { after: 200 },
                 })
-            )
-          ]
-        }
-      ]
+            ),
+          ],
+        },
+      ],
     });
-      
 
-    const docxBytes = await Packer.toBuffer(doc);
-    const docxBase64 = Buffer.from(docxBytes).toString("base64");
+    const docxBase64 = Buffer.from(await Packer.toBuffer(doc)).toString(
+      "base64"
+    );
 
     /* -------- SEND EMAIL -------- */
     const payload = {
       Messages: [
         {
-          From: { Email: process.env.MJ_SENDER_EMAIL, Name: "AIVS Budget Assistant" },
+          From: {
+            Email: process.env.MJ_SENDER_EMAIL,
+            Name: "AIVS Budget Assistant",
+          },
           To: [{ Email: email }],
           Cc: managerEmail ? [{ Email: managerEmail }] : [],
           Bcc: clientEmail ? [{ Email: clientEmail }] : [],
@@ -236,36 +245,35 @@ app.post("/ask", verifyOrigin, async (req, res) => {
             {
               ContentType: "application/pdf",
               Filename: "Budget-2025-Report.pdf",
-              Base64Content: pdfBase64
+              Base64Content: pdfBase64,
             },
             {
               ContentType:
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
               Filename: "Budget-2025-Report.docx",
-              Base64Content: docxBase64
-            }
-          ]
-        }
-      ]
+              Base64Content: docxBase64,
+            },
+          ],
+        },
+      ],
     };
 
-    const mjRes = await fetch("https://api.mailjet.com/v3.1/send", {
+    const mj = await fetch("https://api.mailjet.com/v3.1/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "AIVS-Budget-Assistant/1.0",
+        "User-Agent": "AIVS-Budget-Assistant",
         Authorization:
           "Basic " +
           Buffer.from(
             process.env.MJ_APIKEY_PUBLIC + ":" + process.env.MJ_APIKEY_PRIVATE
-          ).toString("base64")
+          ).toString("base64"),
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
-    console.log("📨 Mailjet:", mjRes.status, await mjRes.text());
+    console.log("📨 Mailjet:", mj.status, await mj.text());
 
-    /* -------- RETURN HTML -------- */
     res.json({ question: cleanQuestion, html });
   } catch (e) {
     console.error("❌ ERROR:", e);
