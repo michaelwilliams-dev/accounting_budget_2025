@@ -14,6 +14,16 @@
       margin: auto;
       color: #333;
     }
+
+    /* ISO TIMESTAMP AT TOP */
+    #page-iso {
+      font-size: 0.95rem;
+      color: #4e65ac;
+      margin-bottom: 15px;
+      text-align: left;
+      font-weight: bold;
+    }
+
     h2 { text-align: center; color: #4e65ac; }
     label {
       font-weight: bold;
@@ -38,13 +48,7 @@
       font-size: 1rem;
     }
     button:hover { background-color: #3c5093; }
-    pre {
-      background: #f4f4f4;
-      padding: 15px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      white-space: pre-wrap;
-    }
+
     .terms-box {
       font-size: 14px;
       margin-top: 15px;
@@ -66,11 +70,29 @@
       margin-bottom: 10px;
       min-height: 1em;
     }
+
+    /* Requested: smaller, left aligned headings */
+    #response h1 {
+      font-size: 1.4rem;
+      text-align: left !important;
+      color: #4e65ac;
+      margin-top: 15px;
+    }
+    #response h2 {
+      font-size: 1.2rem;
+      text-align: left !important;
+      color: #4e65ac;
+      margin-top: 12px;
+    }
   </style>
 </head>
 <body>
+
+  <!-- ✔ ISO TIMESTAMP MOVED TO TOP -->
+  <div id="page-iso">🕒 ISO Timestamp: <span id="iso-timestamp"></span></div>
+
   <h2>Budget Assistant</h2>
-  <p>🕒 ISO Timestamp: <span id="iso-timestamp"></span></p>
+
   <p style="text-align:center;color:#4e65ac;">
     Autumn Budget 2024 data indexed and available for semantic analysis.
     Updated weekly as HM Treasury and OBR issue revisions.
@@ -103,8 +125,7 @@
   <h3>Report Output</h3>
   <div id="response"></div>
 
-  <!-- ✅ Updated script reference -->
-  <script src="script.js?v=2025-11-07T08:30:00Z"></script>
+  <script src="script.js?v=2025-11-29T14:20:00Z"></script>
 
   <script>
     const termsCheckbox = document.getElementById("termsCheckbox");
@@ -145,5 +166,6 @@
     clarificationBox.addEventListener("input", checkWords);
     window.addEventListener("load", checkWords);
   </script>
+
 </body>
 </html>
