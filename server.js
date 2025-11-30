@@ -1,5 +1,5 @@
-// server.js — Budget 2025 Assistant (FINAL STABLE VERSION)
-// ISO Timestamp: 2025-11-30T15:20:00Z
+// server.js — Budget 2025 Assistant (FINAL FIXED VERSION)
+// ISO Timestamp: 2025-11-30T19:10:00Z
 
 import express from "express";
 import bodyParser from "body-parser";
@@ -31,13 +31,11 @@ function verifyOrigin(req, res, next) {
   if (!origin) return next();
   try {
     const { hostname } = new URL(origin);
-    const allowed = allowedDomains.some(
-      (d) => hostname === d || hostname.endsWith(`.${d}`)
-    );
-    if (!allowed) return next();
+    if (!allowedDomains.includes(hostname)) return next();
   } catch {}
   next();
 }
+
 /* ----------------------------------------------------------------------- */
 
 const PORT = process.env.PORT || 3002;
@@ -48,7 +46,6 @@ app.use(bodyParser.json());
 
 /* ---------------------------- LOAD INDEX ------------------------------- */
 let globalIndex = null;
-
 (async () => {
   console.log("📦 Preloading Budget 2025 JSON Index...");
   globalIndex = await loadIndex();
@@ -60,97 +57,118 @@ async function runSemanticSearch(question) {
   const index = globalIndex || (await loadIndex());
   const matches = await searchIndex(question, index);
 
-  const filtered = matches.filter((m) => m.score >= 0.03).slice(0, 4);
-
+  const filtered = matches.filter(m => m.score >= 0.03);
   console.log(`🔎 Found ${filtered.length} chunks for "${question}"`);
 
   return {
-    context: filtered.map((m) => m.text).join("\n\n"),
-    count: filtered.length,
-    chunks: filtered,
+    context: filtered.map(m => m.text).join("\n\n"),
+    chunks: filtered
   };
 }
 
 /* ---------------------------- REPORT BUILDER ---------------------------- */
 async function generateHTMLReport(question) {
-  const { context, count, chunks } = await runSemanticSearch(question);
+  const { context, chunks } = await runSemanticSearch(question);
 
-  const saving = `
-  <h2>11. Saving Clause</h2>
-  <p style="font-size:0.9rem; color:#555;">
-    This report has been generated automatically by AIVS Software Limited.
-    It is provided for internal guidance only and does not constitute formal
-    accounting, tax, financial, or legal advice.
-  </p>`;
+  const savingClause = `
+<h2>11. Saving Clause</h2>
+<p style="font-size:0.9rem;color:#555;">
+This report has been generated automatically by AIVS Software Limited.
+It is provided for internal guidance only and does not constitute
+formal accounting, tax, financial, or legal advice.
+</p>`;
 
-  if (!count || !context.trim()) {
+  if (!context.trim()) {
     return `
 <div class="report">
 <h1>Budget 2025 Report</h1>
 <h2>1. Query Restated</h2><p>${question}</p>
-<h2>2. Measures</h2><ul><li>No relevant measures in Budget 2025.</li></ul>
-<h2>3. Figures</h2><ul><li>No figures.</li></ul>
-<h2>4. OBR</h2><p>None.</p>
-<h2>5. Implications</h2><ul><li>No impact.</li></ul>
-<h2>6. References</h2><ul><li>No sources.</li></ul>
-<h2>7. Summary</h2><p>No change.</p>
-<h2>8. Reason</h2><p>No Budget changes in this area.</p>
+<h2>2. Measures</h2><ul><li>No relevant Budget 2025 measures found.</li></ul>
+<h2>3. Figures</h2><ul><li>No figures in indexed data.</li></ul>
+<h2>4. OBR Commentary</h2><p>No OBR commentary available.</p>
+<h2>5. Practical Implications</h2><ul><li>No impacts identified.</li></ul>
+<h2>6. Source References</h2><ul><li>No documents matched.</li></ul>
+<h2>7. Summary</h2><p>No changes affect this topic.</p>
+<h2>8. Reason</h2><p>Budget 2025 did not introduce measures in this area.</p>
 <h2>9. Current HMRC Rules</h2><ul><li>Existing rules apply.</li></ul>
-<h2>10. Advisory Notes</h2><ul><li>Monitor future updates.</li></ul>
-${saving}
-</div>
-`.trim();
+<h2>10. Advisory Notes</h2><ul><li>Monitor HM Treasury updates.</li></ul>
+${savingClause}
+</div>`.trim();
   }
 
+  /* ---------------- FIXED OPENAI PROMPT ---------------- */
   const prompt = `
-Return CLEAN HTML ONLY:
+Return CLEAN HTML ONLY — no markdown.
+
+You MUST produce a complete structured Budget 2025 report.
+Use ONLY the context below.
+
+Extract Budget measures, figures, OBR commentary,
+implications, and HMRC rules directly from the context.
+
+If something is missing, say so clearly.
 
 <div class="report">
 
 <h1>Budget 2025 Report</h1>
 
-<h2>1. Query Restated</h2><p>[restated]</p>
+<h2>1. Query Restated</h2>
+<p>${question}</p>
 
 <h2>2. Relevant Budget 2025 Measures</h2>
-<ul><li>[measures]</li></ul>
+<ul>
+[Extract all measures related to the query from the Budget 2025 context]
+</ul>
 
-<h2>3. Key Figures</h2>
-<ul><li>[figures]</li></ul>
+<h2>3. Key Figures & Thresholds</h2>
+<ul>
+[Extract any monetary figures, amounts, thresholds or percentages]
+</ul>
 
-<h2>4. OBR Commentary</h2><p>[obr]</p>
+<h2>4. OBR Commentary</h2>
+<p>
+[Summarise any OBR commentary appearing in the context. If none, state that none is present.]
+</p>
 
 <h2>5. Practical Implications</h2>
-<ul><li>[impact]</li></ul>
+<ul>
+[Explain practical effects strictly using the context — do NOT invent content]
+</ul>
 
 <h2>6. Source References</h2>
 <ul>
-${chunks.map((c) => `<li>${c.file || "Unknown"}</li>`).join("\n")}
+${chunks.map(c => `<li>${c.file || "Unknown source"}</li>`).join("\n")}
 </ul>
 
-<h2>7. Summary</h2><p>[summary]</p>
+<h2>7. Summary</h2>
+<p>[Provide a clear final summary of the Budget 2025 impact related to this query.]</p>
 
-<h2>8. Reason</h2><p>If detail is limited, no Budget changes exist.</p>
+<h2>8. Reason</h2>
+<p>[If content is thin, explain precisely why.]</p>
 
 <h2>9. Current HMRC Rules</h2>
-<ul><li>Existing rules apply.</li></ul>
+<ul>
+[Summarise known HMRC rules related to this topic using context + standard rules]
+</ul>
 
 <h2>10. Advisory Notes</h2>
-<ul><li>Monitor HMRC updates.</li></ul>
+<ul>
+[Provide safe advisory notes — NEVER speculate beyond context]
+</ul>
 
-${saving}
+${savingClause}
 
 </div>
 
-Context:
+CONTEXT:
 ${context}
 
-Question: ${question}
 `.trim();
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content: prompt }]
   });
 
   return `<div class="aivs-html-output">${completion.choices[0].message.content}</div>`;
@@ -158,107 +176,95 @@ Question: ${question}
 
 /* ---------------------------- /ASK (EMAIL + PDF + DOCX) ---------------------------- */
 app.post("/ask", verifyOrigin, async (req, res) => {
-  const { question, email } = req.body;
-  const managerEmail = req.body.managerEmail || "";
-  const clientEmail = req.body.clientEmail || "";
-
-  const cleanQuestion = String(question || "").trim();
+  const { question, email, managerEmail, clientEmail } = req.body;
   const isoNow = new Date().toISOString();
 
   try {
-    const html = await generateHTMLReport(cleanQuestion);
+    const html = await generateHTMLReport(question);
 
-    /* -------- PDF -------- */
+    /* ---------- CLEAN TEXT FOR PDF/DOCX ---------- */
+    const plain = html
+      .replace(/<h1>/g, "\n# ")
+      .replace(/<\/h1>/g, "\n\n")
+      .replace(/<h2>/g, "\n## ")
+      .replace(/<\/h2>/g, "\n\n")
+      .replace(/<li>/g, "• ")
+      .replace(/<\/li>/g, "\n")
+      .replace(/<p>/g, "")
+      .replace(/<\/p>/g, "\n\n")
+      .replace(/<br\s*\/?>/g, "\n")
+      .replace(/<[^>]+>/g, "");
+
+    /* --------------------- PDF --------------------- */
     const pdfDoc = await PDFDocument.create();
     let page = pdfDoc.addPage([595, 842]);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    page.drawText("AIVS Budget 2025 Report", { x: 40, y: 800, size: 18 });
-    page.drawText(`ISO Timestamp: ${isoNow}`, { x: 40, y: 780, size: 10 });
+    page.drawText("AIVS Budget 2025 Report", { x: 40, y: 800, size: 18, font });
+    page.drawText(`ISO Timestamp: ${isoNow}`, { x: 40, y: 780, size: 10, font });
 
     let y = 760;
-    const plain = html.replace(/<[^>]+>/g, "");
-    for (let line of plain.split("\n")) {
-      if (y < 60) {
+    for (const line of plain.split("\n")) {
+      if (y < 40) {
         page = pdfDoc.addPage([595, 842]);
         y = 780;
       }
-      page.drawText(line, { x: 40, y, size: 11, font });
-      y -= 16;
+      page.drawText(line.trim(), { x: 40, y, size: 11, font });
+      y -= 14;
     }
 
     const pdfBase64 = Buffer.from(await pdfDoc.save()).toString("base64");
 
-    /* -------- DOCX -------- */
+    /* --------------------- DOCX --------------------- */
     const doc = new Document({
       sections: [
         {
-          children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "AIVS Budget 2025 Report",
-                  bold: true,
-                  size: 36,
-                }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: `ISO Timestamp: ${isoNow}`,
-                  size: 20,
-                  color: "555555",
-                }),
-              ],
-            }),
-            ...plain.split("\n").map(
-              (line) =>
-                new Paragraph({
-                  children: [new TextRun({ text: line, size: 24 })],
-                  spacing: { after: 200 },
-                })
-            ),
-          ],
-        },
-      ],
+          children: plain.split("\n").map(
+            line =>
+              new Paragraph({
+                children: [new TextRun({ text: line || "", size: 24 })],
+                spacing: { after: 200 }
+              })
+          )
+        }
+      ]
     });
 
-    const docxBase64 = Buffer.from(await Packer.toBuffer(doc)).toString(
-      "base64"
-    );
+    const docxBase64 = Buffer.from(
+      await Packer.toBuffer(doc)
+    ).toString("base64");
 
-    /* -------- SEND EMAIL -------- */
+    /* --------------------- EMAIL --------------------- */
     const payload = {
       Messages: [
         {
           From: {
             Email: process.env.MJ_SENDER_EMAIL,
-            Name: "AIVS Budget Assistant",
+            Name: "AIVS Budget Assistant"
           },
           To: [{ Email: email }],
           Cc: managerEmail ? [{ Email: managerEmail }] : [],
           Bcc: clientEmail ? [{ Email: clientEmail }] : [],
-          Subject: `Your Budget 2025 Report – ${isoNow}`,
+          Subject: `Your Budget 2025 Report — ${isoNow}`,
           HTMLPart: html,
           Attachments: [
             {
               ContentType: "application/pdf",
               Filename: "Budget-2025-Report.pdf",
-              Base64Content: pdfBase64,
+              Base64Content: pdfBase64
             },
             {
               ContentType:
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
               Filename: "Budget-2025-Report.docx",
-              Base64Content: docxBase64,
-            },
-          ],
-        },
-      ],
+              Base64Content: docxBase64
+            }
+          ]
+        }
+      ]
     };
 
-    const mj = await fetch("https://api.mailjet.com/v3.1/send", {
+    const mjRes = await fetch("https://api.mailjet.com/v3.1/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -267,16 +273,17 @@ app.post("/ask", verifyOrigin, async (req, res) => {
           "Basic " +
           Buffer.from(
             process.env.MJ_APIKEY_PUBLIC + ":" + process.env.MJ_APIKEY_PRIVATE
-          ).toString("base64"),
+          ).toString("base64")
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload)
     });
 
-    console.log("📨 Mailjet:", mj.status, await mj.text());
+    console.log("📨 MAILJET:", mjRes.status, await mjRes.text());
 
-    res.json({ question: cleanQuestion, html });
-  } catch (e) {
-    console.error("❌ ERROR:", e);
+    res.json({ question, html });
+
+  } catch (err) {
+    console.error("❌ ERROR IN /ask:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
