@@ -1,10 +1,10 @@
-// public/script.js — Accountant Assistant PRO
-// ISO Timestamp: 🕒 2025-10-14T10:45:00Z
-// ✅ Connects to accounting-assistant-pro backend via same-origin /ask
-// ✅ Sends all three email fields (user, manager, optional)
-// ✅ Displays accountant report or clear error message
+// public/script.js — Budget 2025 / Accountant Assistant Frontend
+// ISO Timestamp: 🕒 2025-11-29T12:00:00Z
+// ✔ Correctly handles backend fields: html, answer, reportText
+// ✔ Removes false "No report returned" warnings
+// ✔ Stable, minimal, production-safe
 
-console.log("CLIENT JS VERSION = v2025-10-14T10:45:00Z (Accounting Assistant PRO)");
+console.log("CLIENT JS VERSION = v2025-11-29T12:00:00Z (Budget/Accountant Assistant)");
 
 document.addEventListener("DOMContentLoaded", () => {
   const $ = (id) => document.getElementById(id);
@@ -43,11 +43,10 @@ document.addEventListener("DOMContentLoaded", () => {
       ts: new Date().toISOString(),
     };
 
-    console.log("📤 [CLIENT /ask] Sending payload", payload);
-    output.textContent = "⏳ Semantic Search then generating Accountant Report – please wait.";
+    console.log("📤 [CLIENT /ask] Sending payload:", payload);
+    output.textContent = "⏳ Generating Budget 2025 report… please wait.";
 
     try {
-      // ✅ same-origin endpoint
       const res = await fetch("/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,16 +61,22 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // ======== BEGIN CHANGED LINES ========
-      if (data?.answer) {
+      console.log("📥 [CLIENT /ask] Response:", data);
+
+      /* =============================================================
+         CORRECTED RESPONSE HANDLER
+         Supports backend fields: html, answer, reportText
+         ============================================================= */
+      if (data?.html) {
+        output.innerHTML = data.html;
+      } else if (data?.answer) {
         output.innerHTML = data.answer;
       } else if (data?.reportText) {
         output.innerHTML = data.reportText;
       } else {
         output.innerHTML = "⚠️ No report returned. Please check backend logs.";
-        console.warn("⚠️ Unexpected response:", data);
+        console.warn("⚠️ Unexpected backend response structure:", data);
       }
-      // ======== END CHANGED LINES ========
 
     } catch (err) {
       console.error("❌ Network or fetch error:", err);
