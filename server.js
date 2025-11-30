@@ -66,8 +66,9 @@ let globalIndex = null;
 async function runSemanticSearch(question) {
   const index = globalIndex || (await loadIndex());
   const matches = await searchIndex(question, index);
-  const filtered = matches.filter(m => m.score >= 0.03);
-
+  const filtered = matches
+    .filter(m => m.score >= 0.03)
+    .slice(0, 4); // use top 4 chunks for fast, stable formatting
   console.log(`🔎 Found ${filtered.length} chunks for "${question}"`);
 
   return {
