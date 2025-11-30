@@ -186,14 +186,30 @@ app.post("/ask", verifyOrigin, async (req, res) => {
                   size: 36,
                   color: "4e65ac"
                 })
-                                  .color("4e65ac")
-              ]
+              ],
+              spacing: { after: 300 }
             }),
-            new Paragraph(`ISO Timestamp: ${isoNow}`),
+    
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `ISO Timestamp: ${isoNow}`,
+                  size: 20,
+                  color: "555555"
+                })
+              ],
+              spacing: { after: 300 }
+            }),
+    
             ...plain.split("\n").map(
-              line =>
+              (line) =>
                 new Paragraph({
-                  children: [new TextRun(line)],
+                  children: [
+                    new TextRun({
+                      text: line,
+                      size: 24
+                    })
+                  ],
                   spacing: { after: 200 }
                 })
             )
@@ -201,6 +217,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
         }
       ]
     });
+      
 
     const docxBytes = await Packer.toBuffer(doc);
     const docxBase64 = Buffer.from(docxBytes).toString("base64");
