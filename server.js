@@ -180,10 +180,13 @@ app.post("/ask", verifyOrigin, async (req, res) => {
           children: [
             new Paragraph({
               children: [
-                new TextRun("AIVS Budget 2025 Report")
-                  .bold(true)
-                  .size(36)
-                  .color("4e65ac")
+                new TextRun({
+                  text: "AIVS Budget 2025 Report",
+                  bold: true,
+                  size: 36,
+                  color: "4e65ac"
+                })
+                                  .color("4e65ac")
               ]
             }),
             new Paragraph(`ISO Timestamp: ${isoNow}`),
