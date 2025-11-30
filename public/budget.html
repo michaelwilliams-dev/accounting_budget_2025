@@ -24,7 +24,12 @@
       font-weight: bold;
     }
 
-    h2 { text-align: center; color: #4e65ac; }
+    /* Page headings aligned left */
+    h2, h3 {
+      text-align: left !important;
+      color: #4e65ac;
+    }
+
     label {
       font-weight: bold;
       margin-top: 10px;
@@ -58,7 +63,9 @@
 
     #response {
       line-height: 1.5;
+      white-space: normal !important;   /* ← ensures HTML displays correctly */
     }
+
     #response strong {
       font-weight: bold;
       color: #4e65ac;
@@ -71,7 +78,7 @@
       min-height: 1em;
     }
 
-    /* Requested: smaller, left aligned headings */
+    /* Report headings smaller + left */
     #response h1 {
       font-size: 1.4rem;
       text-align: left !important;
@@ -88,12 +95,12 @@
 </head>
 <body>
 
-  <!-- ✔ ISO TIMESTAMP MOVED TO TOP -->
+  <!-- ISO TIMESTAMP at top -->
   <div id="page-iso">🕒 ISO Timestamp: <span id="iso-timestamp"></span></div>
 
   <h2>Budget Assistant</h2>
 
-  <p style="text-align:center;color:#4e65ac;">
+  <p style="color:#4e65ac;">
     Autumn Budget 2024 data indexed and available for semantic analysis.
     Updated weekly as HM Treasury and OBR issue revisions.
   </p>
