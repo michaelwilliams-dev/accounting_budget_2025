@@ -29,7 +29,6 @@ const allowedDomains = [
 function verifyOrigin(req, res, next) {
   const origin = req.get("Origin");
   if (!origin) return next();
-
   try {
     const { hostname } = new URL(origin);
     const allowed = allowedDomains.some(
@@ -77,8 +76,6 @@ async function runSemanticSearch(question) {
 /* ---------------------------- REPORT BUILDER ---------------------------- */
 async function generateHTMLReport(question) {
   const { context, count, chunks } = await runSemanticSearch(question);
-  const isoNow = new Date().toISOString();
-
   const savingClause = `
   <h2>11. Saving Clause</h2>
   <p style="font-size:0.9rem; color:#555;">
@@ -87,101 +84,56 @@ async function generateHTMLReport(question) {
     formal accounting, tax, financial, or legal advice.
     All information must be independently verified against original records,
     HMRC publications, and the relevant regulations before any decisions or filings are made.
-  </p>
-  `;
+  </p>`;
 
-  /* ------------------ FALLBACK ------------------ */
   if (!count || !context.trim()) {
     return `
 <div class="report">
   <h1>Budget 2025 Report</h1>
-
-  <h2>1. Query Restated</h2>
-  <p>${question}</p>
-
-  <h2>2. Relevant Budget 2025 Measures</h2>
-  <ul><li>No Budget 2025 measures relate to this topic.</li></ul>
-
-  <h2>3. Key Figures & Thresholds</h2>
-  <ul><li>No new figures apply.</li></ul>
-
-  <h2>4. OBR Commentary</h2>
-  <p>No OBR commentary.</p>
-
-  <h2>5. Practical Implications</h2>
-  <ul><li>Existing rules continue unchanged.</li></ul>
-
-  <h2>6. Source References</h2>
-  <ul><li>No relevant GOV.UK documents.</li></ul>
-
-  <h2>7. Summary</h2>
-  <p>No Budget impact identified.</p>
-
-  <h2>8. Reason</h2>
-  <p>This area was not amended in the Autumn Budget 2024.</p>
-
-  <h2>9. Current HMRC Rules</h2>
-  <ul><li>Existing guidance applies.</li></ul>
-
-  <h2>10. Advisory Notes</h2>
-  <ul><li>Monitor future HM Treasury publications.</li></ul>
-
+  <h2>1. Query Restated</h2><p>${question}</p>
+  <h2>2. Relevant Budget 2025 Measures</h2><ul><li>No Budget measures found.</li></ul>
+  <h2>3. Key Figures</h2><ul><li>No figures available.</li></ul>
+  <h2>4. OBR Commentary</h2><p>None found.</p>
+  <h2>5. Practical Implications</h2><ul><li>No changes required.</li></ul>
+  <h2>6. Sources</h2><ul><li>No sources.</li></ul>
+  <h2>7. Summary</h2><p>No impact.</p>
+  <h2>8. Reason</h2><p>No changes in Budget.</p>
+  <h2>9. Current HMRC Rules</h2><ul><li>Existing rules apply.</li></ul>
+  <h2>10. Advisory Notes</h2><ul><li>Monitor future updates.</li></ul>
   ${savingClause}
-</div>
-    `.trim();
+</div>`.trim();
   }
 
-  /* --------------- MAIN REPORT VIA OPENAI ---------------- */
   const prompt = `
-You must answer ONLY using the context.
-Return CLEAN HTML only. Use this exact 11-section structure:
+You must answer ONLY using the context. Return CLEAN HTML ONLY.
 
 <div class="report">
 
-  <h1>Budget 2025 Report</h1>
+<h1>Budget 2025 Report</h1>
 
-  <h2>1. Query Restated</h2>
-  <p>[Restate the question]</p>
+<h2>1. Query Restated</h2><p>[Restate]</p>
+<h2>2. Relevant Budget 2025 Measures</h2><ul><li>[Measures]</li></ul>
+<h2>3. Key Figures</h2><ul><li>[Figures]</li></ul>
+<h2>4. OBR Commentary</h2><p>[OBR]</p>
+<h2>5. Practical Implications</h2><ul><li>[Impact]</li></ul>
+<h2>6. Sources</h2><ul>
+${chunks.map(c => `<li>${c.file || "Unknown source"}</li>`).join("\n")}
+</ul>
+<h2>7. Summary</h2><p>[Wrap-up]</p>
+<h2>8. Reason</h2><p>If context limited, no Budget changes.</p>
+<h2>9. Current HMRC Rules</h2><ul><li>Existing rules apply.</li></ul>
+<h2>10. Advisory Notes</h2><ul><li>Monitor HMRC updates.</li></ul>
 
-  <h2>2. Relevant Budget 2025 Measures</h2>
-  <ul><li>[Measures]</li></ul>
-
-  <h2>3. Key Figures & Thresholds</h2>
-  <ul><li>[Numbers]</li></ul>
-
-  <h2>4. OBR Commentary</h2>
-  <p>[OBR text]</p>
-
-  <h2>5. Practical Implications</h2>
-  <ul><li>[Impacts]</li></ul>
-
-  <h2>6. Source References</h2>
-  <ul>
-    ${chunks.map(c => `<li>${c.file || "Unknown source"}</li>`).join("\n")}
-  </ul>
-
-  <h2>7. Summary</h2>
-  <p>[Wrap-up]</p>
-
-  <h2>8. Reason</h2>
-  <p>If limited, HM Treasury made no Budget changes in this area.</p>
-
-  <h2>9. Current HMRC Rules (General)</h2>
-  <ul><li>Existing HMRC guidance applies.</li></ul>
-
-  <h2>10. Advisory Notes</h2>
-  <ul><li>Monitor future Budget updates.</li></ul>
-
-  ${savingClause}
+${savingClause}
 
 </div>
 
+Context:
+${context}
 Question: ${question}
-Context: ${context}
-  `.trim();
+`.trim();
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [{ role: "user", content: prompt }]
@@ -197,10 +149,9 @@ app.post("/ask", verifyOrigin, async (req, res) => {
   const isoNow = new Date().toISOString();
 
   try {
-    /* 1. Generate HTML */
     const html = await generateHTMLReport(cleanQuestion);
 
-    /* 2. Generate PDF */
+    /* -------- PDF -------- */
     const pdfDoc = await PDFDocument.create();
     let page = pdfDoc.addPage([595, 842]);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -222,17 +173,26 @@ app.post("/ask", verifyOrigin, async (req, res) => {
     const pdfBytes = await pdfDoc.save();
     const pdfBase64 = Buffer.from(pdfBytes).toString("base64");
 
-    /* 3. Generate DOCX */
+    /* -------- DOCX -------- */
     const doc = new Document({
       sections: [
         {
           children: [
             new Paragraph({
-              children: [new TextRun({ text: "AIVS Budget 2025 Report", size: 36, bold: true })]
+              children: [
+                new TextRun("AIVS Budget 2025 Report")
+                  .bold()
+                  .size(36)
+                  .color("4e65ac")
+              ]
             }),
-            new Paragraph({ children: [new TextRun(`ISO Timestamp: ${isoNow}`)] }),
+            new Paragraph(`ISO Timestamp: ${isoNow}`),
             ...plain.split("\n").map(
-              line => new Paragraph({ children: [new TextRun(line)], spacing: { after: 200 } })
+              line =>
+                new Paragraph({
+                  children: [new TextRun(line)],
+                  spacing: { after: 200 }
+                })
             )
           ]
         }
@@ -242,7 +202,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
     const docxBytes = await Packer.toBuffer(doc);
     const docxBase64 = Buffer.from(docxBytes).toString("base64");
 
-    /* 4. SEND EMAIL */
+    /* -------- SEND EMAIL -------- */
     const payload = {
       Messages: [
         {
@@ -269,7 +229,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
       ]
     };
 
-    await fetch("https://api.mailjet.com/v3.1/send", {
+    const mjRes = await fetch("https://api.mailjet.com/v3.1/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -283,9 +243,10 @@ app.post("/ask", verifyOrigin, async (req, res) => {
       body: JSON.stringify(payload)
     });
 
-    /* 5. Return HTML to frontend */
-    res.json({ question: cleanQuestion, html });
+    console.log("📨 Mailjet:", mjRes.status, await mjRes.text());
 
+    /* -------- RETURN HTML -------- */
+    res.json({ question: cleanQuestion, html });
   } catch (e) {
     console.error("❌ ERROR:", e);
     res.status(500).json({ error: "Internal server error" });
