@@ -1,16 +1,20 @@
 // public/script.js — Budget 2025 / Accountant Assistant Frontend
-// ISO Timestamp: 🕒 2025-11-29T12:00:00Z
+// ISO Timestamp: 🕒 2025-11-29T12:20:00Z
+// ✔ Correct output element detection (output or response)
 // ✔ Correctly handles backend fields: html, answer, reportText
 // ✔ Removes false "No report returned" warnings
 // ✔ Stable, minimal, production-safe
 
-console.log("CLIENT JS VERSION = v2025-11-29T12:00:00Z (Budget/Accountant Assistant)");
+console.log("CLIENT JS VERSION = v2025-11-29T12:20:00Z (Budget/Accountant Assistant)");
 
 document.addEventListener("DOMContentLoaded", () => {
   const $ = (id) => document.getElementById(id);
 
   const generateBtn = $("generate");
-  const output = $("response");
+
+  // 🔥 FIX: support both id="output" and id="response"
+  const output = $("output") || $("response");
+
   const emailInput = $("email");
   const managerInput = $("managerEmail");
   const clientInput = $("clientEmail");
@@ -21,6 +25,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (!generateBtn) {
     console.error("❌ Missing #generate button");
+    return;
+  }
+
+  if (!output) {
+    console.error("❌ No output container found (#output or #response missing)");
     return;
   }
 
