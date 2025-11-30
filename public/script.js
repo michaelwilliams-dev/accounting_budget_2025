@@ -1,19 +1,16 @@
 // public/script.js — Budget 2025 / Accountant Assistant Frontend
-// ISO Timestamp: 🕒 2025-11-29T12:20:00Z
-// ✔ Correct output element detection (output or response)
+// ISO Timestamp: 🕒 2025-11-29T12:30:00Z
+// ✔ Correct output element (#response)
 // ✔ Correctly handles backend fields: html, answer, reportText
 // ✔ Removes false "No report returned" warnings
-// ✔ Stable, minimal, production-safe
 
-console.log("CLIENT JS VERSION = v2025-11-29T12:20:00Z (Budget/Accountant Assistant)");
+console.log("CLIENT JS VERSION = v2025-11-29T12:30:00Z (Budget/Accountant Assistant)");
 
 document.addEventListener("DOMContentLoaded", () => {
   const $ = (id) => document.getElementById(id);
 
   const generateBtn = $("generate");
-
-  // 🔥 FIX: support both id="output" and id="response"
-  const output = $("output") || $("response");
+  const output = $("response");  // ✅ FIXED: matches your HTML <div id="response">
 
   const emailInput = $("email");
   const managerInput = $("managerEmail");
@@ -29,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (!output) {
-    console.error("❌ No output container found (#output or #response missing)");
+    console.error("❌ Missing #response container in HTML");
     return;
   }
 
@@ -40,7 +37,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const clientEmail = clientInput?.value?.trim() || "";
 
     if (!question) {
-      output.textContent = "❌ Please enter a question or description.";
+      output.textContent = "❌ Please enter a question or topic.";
       return;
     }
 
@@ -77,11 +74,11 @@ document.addEventListener("DOMContentLoaded", () => {
          Supports backend fields: html, answer, reportText
          ============================================================= */
       if (data?.html) {
-        output.innerHTML = data.html;
+        output.innerHTML = data.html;           // ✅ Budget Assistant format
       } else if (data?.answer) {
-        output.innerHTML = data.answer;
+        output.innerHTML = data.answer;         // Legacy assistants
       } else if (data?.reportText) {
-        output.innerHTML = data.reportText;
+        output.innerHTML = data.reportText;     // Fallback
       } else {
         output.innerHTML = "⚠️ No report returned. Please check backend logs.";
         console.warn("⚠️ Unexpected backend response structure:", data);
