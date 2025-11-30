@@ -297,7 +297,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
         Authorization:
           "Basic " +
           Buffer.from(
-            process.env.MJ_PUBLIC + ":" + process.env.MJ_PRIVATE
+            process.env.MJ_APIKEY_PUBLIC + ":" + process.env.MJ_APIKEY_PRIVATE
           ).toString("base64")
       },
       body: JSON.stringify(payload)
