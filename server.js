@@ -201,7 +201,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
 
     /* -------- PDF -------- */
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595, 842]);
+    let page = pdfDoc.addPage([595, 842]);     // ← FIXED (let, not const)
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
