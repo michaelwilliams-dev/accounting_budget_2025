@@ -290,16 +290,15 @@ app.post("/ask", verifyOrigin, async (req, res) => {
       ]
     };
 
-    await fetch("https://api.mailjet.com/v3.1/send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization:
-          "Basic " +
-          Buffer.from(
-            process.env.MJ_APIKEY_PUBLIC + ":" + process.env.MJ_APIKEY_PRIVATE
-          ).toString("base64")
-      },
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "AIVS-Budget-Assistant/1.0",
+      Authorization:
+        "Basic " +
+        Buffer.from(
+          process.env.MJ_APIKEY_PUBLIC + ":" + process.env.MJ_APIKEY_PRIVATE
+        ).toString("base64")
+    }
       body: JSON.stringify(payload)
     });
 
