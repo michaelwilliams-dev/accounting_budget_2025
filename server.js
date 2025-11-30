@@ -181,7 +181,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
             new Paragraph({
               children: [
                 new TextRun("AIVS Budget 2025 Report")
-                  .bold()
+                  .bold(true)
                   .size(36)
                   .color("4e65ac")
               ]
