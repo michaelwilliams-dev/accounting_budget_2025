@@ -238,15 +238,21 @@ app.post("/ask", verifyOrigin, async (req, res) => {
     const payload = {
       Messages: [
         {
-          From: {
-            Email: process.env.MJ_SENDER_EMAIL,
-            Name: "AIVS Budget Assistant"
+          From: { 
+            Email: "noreply@securemaildrop.uk",
+            Name: "Secure Maildrop"
           },
+    
           To: [{ Email: email }],
           Cc: managerEmail ? [{ Email: managerEmail }] : [],
           Bcc: clientEmail ? [{ Email: clientEmail }] : [],
           Subject: `Your Budget 2025 Report — ${isoNow}`,
+    
+          // REQUIRED (same as accounting)
+          TextPart: plain,
+    
           HTMLPart: html,
+    
           Attachments: [
             {
               ContentType: "application/pdf",
@@ -263,7 +269,6 @@ app.post("/ask", verifyOrigin, async (req, res) => {
         }
       ]
     };
-
     const mjRes = await fetch("https://api.mailjet.com/v3.1/send", {
       method: "POST",
       headers: {
