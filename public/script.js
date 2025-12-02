@@ -1,8 +1,8 @@
 // public/script.js — Budget 2025 / Accountant Assistant Frontend
 // ISO Timestamp: 🕒 2025-11-29T13:45:00Z
 // ✔ Correct output element (#response)
-// ✔ Correctly handles backend fields: html, answer, reportText
-// ✔ Removes false "No report returned" warnings
+// ✔ Handles backend fields: html, answer, reportText
+// ✔ Clear button added (question + output only)
 
 console.log("CLIENT JS VERSION = v2025-11-29T13:45:00Z (Budget/Accountant Assistant)");
 
@@ -10,7 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const $ = (id) => document.getElementById(id);
 
   const generateBtn = $("generate");
-  const output = $("response");  // Correct container
+  const clearBtn = $("clear");              // ← NEW
+  const output = $("response");
 
   const emailInput = $("email");
   const managerInput = $("managerEmail");
@@ -71,15 +72,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Corrected response handler
       if (data?.html) {
-        output.innerHTML = data.html;           // Budget Assistant HTML output
+        output.innerHTML = data.html;
       } else if (data?.answer) {
-        output.innerHTML = data.answer;         // Legacy assistants
+        output.innerHTML = data.answer;
       } else if (data?.reportText) {
-        output.innerHTML = data.reportText;     // Fallback
+        output.innerHTML = data.reportText;
       } else {
         output.innerHTML = "⚠️ No report returned. Please check backend logs.";
         console.warn("⚠️ Unexpected backend response structure:", data);
       }
+
+      // ---- SHOW CLEAR BUTTON (NEW) ----
+      if (clearBtn) clearBtn.style.display = "block";
 
     } catch (err) {
       console.error("❌ Network or fetch error:", err);
@@ -87,4 +91,13 @@ document.addEventListener("DOMContentLoaded", () => {
         "❌ Failed to contact backend: " + (err.message || String(err));
     }
   });
+
+  // ---- CLEAR BUTTON LOGIC (NEW) ----
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      if (clarificationInput) clarificationInput.value = ""; // clear question only
+      if (output) output.innerHTML = "";                    // clear output
+      clearBtn.style.display = "none";                      // hide button again
+    });
+  }
 });
