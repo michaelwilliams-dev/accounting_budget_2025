@@ -63,7 +63,7 @@
 
     #response {
       line-height: 1.5;
-      white-space: normal !important;   /* ← ensures HTML displays correctly */
+      white-space: normal !important;
     }
 
     #response strong {
@@ -128,6 +128,14 @@
   </div>
 
   <button id="generate">Generate Budget Report</button>
+
+  <!-- NEW CLEAR BUTTON -->
+  <button id="clear"
+    style="display:none; background:#4e65ac; color:white;
+           padding:10px; border:none; border-radius:6px;
+           width:100%; margin-top:10px;">
+    Clear
+  </button>
 
   <h3>Report Output</h3>
   <div id="response"></div>
