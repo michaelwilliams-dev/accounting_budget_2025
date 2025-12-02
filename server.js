@@ -103,11 +103,7 @@ Do NOT write the words "html", "HTML", or meta instructions in your output.
 
 You MUST produce a complete structured Budget 2025 report.
 Use ONLY the context below.
-
-Extract Budget measures, figures, OBR commentary,
-implications, and HMRC rules directly from the context.
-
-If something is missing, say so clearly.
+If something is missing, state this clearly.
 
 <div class="report">
 
@@ -123,18 +119,14 @@ If something is missing, say so clearly.
 
 <h2>3. Key Figures & Thresholds</h2>
 <ul>
-[Extract any monetary figures, amounts, thresholds or percentages]
+[Extract monetary figures, limits, thresholds or percentages]
 </ul>
 
 <h2>4. OBR Commentary</h2>
-<p>
-[Summarise any OBR commentary appearing in the context. If none, state that none is present.]
-</p>
+<p>[Summarise any OBR commentary from the context]</p>
 
 <h2>5. Practical Implications</h2>
-<ul>
-[Explain practical effects strictly using the context — do NOT invent content]
-</ul>
+<ul>[Explain practical impacts strictly using context]</ul>
 
 <h2>6. Source References</h2>
 <ul>
@@ -142,20 +134,16 @@ ${chunks.map(c => `<li>${c.file || "Unknown source"}</li>`).join("\n")}
 </ul>
 
 <h2>7. Summary</h2>
-<p>[Provide a clear final summary of the Budget 2025 impact related to this query.]</p>
+<p>[Provide the main summary]</p>
 
 <h2>8. Reason</h2>
-<p>[If content is thin, explain precisely why.]</p>
+<p>[Explain why details may be limited]</p>
 
 <h2>9. Current HMRC Rules</h2>
-<ul>
-[Summarise known HMRC rules related to this topic using context + standard rules]
-</ul>
+<ul>[Summarise HMRC rules relevant to this topic]</ul>
 
 <h2>10. Advisory Notes</h2>
-<ul>
-[Provide safe advisory notes — NEVER speculate beyond context]
-</ul>
+<ul>[Provide safe, non-speculative advisory notes]</ul>
 
 ${savingClause}
 
@@ -163,8 +151,7 @@ ${savingClause}
 
 CONTEXT:
 ${context}
-
-`.trim();
+  `.trim();
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const completion = await openai.chat.completions.create({
@@ -216,44 +203,70 @@ app.post("/ask", verifyOrigin, async (req, res) => {
 
     const pdfBase64 = Buffer.from(await pdfDoc.save()).toString("base64");
 
-    /* --------------------- DOCX --------------------- */
-    const doc = new Document({
-      sections: [
-        {
-          children: plain.split("\n").map(
-            line =>
-              new Paragraph({
-                children: [new TextRun({ text: line || "", size: 24 })],
-                spacing: { after: 200 }
-              })
-          )
-        }
-      ]
-    });
+    /* --------------------- DOCX (FORMATTED STRUCTURED VERSION) --------------------- */
+    const docChildren = [];
 
-    const docxBase64 = Buffer.from(
-      await Packer.toBuffer(doc)
-    ).toString("base64");
+    const lines = plain.split("\n").map(l => l.trim()).filter(Boolean);
+
+    for (const line of lines) {
+
+      // H1
+      if (line.startsWith("# ")) {
+        docChildren.push(
+          new Paragraph({
+            children: [new TextRun({ text: line.replace("# ", ""), bold: true, size: 48 })],
+            spacing: { after: 300 }
+          })
+        );
+        continue;
+      }
+
+      // H2
+      if (line.startsWith("## ")) {
+        docChildren.push(
+          new Paragraph({
+            children: [new TextRun({ text: line.replace("## ", ""), bold: true, size: 32 })],
+            spacing: { after: 200 }
+          })
+        );
+        continue;
+      }
+
+      // BULLETS
+      if (line.startsWith("• ")) {
+        docChildren.push(
+          new Paragraph({
+            children: [new TextRun({ text: line.replace("• ", ""), size: 24 })],
+            bullet: { level: 0 },
+            spacing: { after: 100 }
+          })
+        );
+        continue;
+      }
+
+      // NORMAL PARAGRAPH
+      docChildren.push(
+        new Paragraph({
+          children: [new TextRun({ text: line, size: 24 })],
+          spacing: { after: 160 }
+        })
+      );
+    }
+
+    const doc = new Document({ sections: [{ children: docChildren }] });
+    const docxBase64 = Buffer.from(await Packer.toBuffer(doc)).toString("base64");
 
     /* --------------------- EMAIL --------------------- */
     const payload = {
       Messages: [
         {
-          From: { 
-            Email: "noreply@securemaildrop.uk",
-            Name: "Secure Maildrop"
-          },
-    
+          From: { Email: "noreply@securemaildrop.uk", Name: "Secure Maildrop" },
           To: [{ Email: email }],
           Cc: managerEmail ? [{ Email: managerEmail }] : [],
           Bcc: clientEmail ? [{ Email: clientEmail }] : [],
           Subject: `Your Budget 2025 Report — ${isoNow}`,
-    
-          // REQUIRED (same as accounting)
           TextPart: plain,
-    
           HTMLPart: html,
-    
           Attachments: [
             {
               ContentType: "application/pdf",
@@ -261,8 +274,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
               Base64Content: pdfBase64
             },
             {
-              ContentType:
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
               Filename: "Budget-2025-Report.docx",
               Base64Content: docxBase64
             }
@@ -270,6 +282,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
         }
       ]
     };
+
     const mjRes = await fetch("https://api.mailjet.com/v3.1/send", {
       method: "POST",
       headers: {
