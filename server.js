@@ -71,7 +71,6 @@ async function generateHTMLReport(question) {
   const { context, chunks } = await runSemanticSearch(question);
   const isoNow = new Date().toISOString();
 
-  // FIXED: Saving clause moved OUTSIDE the report
   const savingClause = `
 <div class="saving-clause" style="margin-top:25px; padding-top:10px; border-top:1px solid #ccc;">
   <p style="font-size:0.9rem;color:#555;">
@@ -83,12 +82,10 @@ async function generateHTMLReport(question) {
 </div>
 `;
 
-  /* ---------------- EMPTY CONTEXT REPORT ---------------- */
   if (!context.trim()) {
     return `
 <div class="report">
 <h1>Budget 2025 Report</h1>
-
 <h2>1. Query Restated</h2><p>${question}</p>
 <h2>2. Measures</h2><ul><li>No relevant Budget 2025 measures found.</li></ul>
 <h2>3. Figures</h2><ul><li>No figures in indexed data.</li></ul>
@@ -104,7 +101,6 @@ async function generateHTMLReport(question) {
 ${savingClause}`.trim();
   }
 
-  /* ---------------- FIXED OPENAI PROMPT (no saving clause inside) ---------------- */
   const prompt = `
 Produce the report directly in HTML format.
 Do NOT write the words "html", "HTML", or meta instructions.
@@ -164,7 +160,6 @@ ${context}
     messages: [{ role: "user", content: prompt }]
   });
 
-  // FIXED: saving clause appended BELOW the report
   return `
 <div class="aivs-html-output">
 ${completion.choices[0].message.content}
@@ -182,7 +177,6 @@ app.post("/ask", verifyOrigin, async (req, res) => {
   try {
     const html = await generateHTMLReport(question);
 
-    /* CLEAN TEXT FOR PDF/DOCX (unchanged) */
     const plain = html
       .replace(/<h1>/g, "\n# ")
       .replace(/<\/h1>/g, "\n\n")
@@ -195,8 +189,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
       .replace(/<br\s*\/?>/g, "\n")
       .replace(/<[^>]+>/g, "");
 
-    /* USB: PDF + DOCX + Email unchanged from your file */
-    // --------------------------------------------------
+    /* --------------------- PDF --------------------- */
     const pdfDoc = await PDFDocument.create();
     let page = pdfDoc.addPage([595, 842]);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -216,6 +209,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
 
     const pdfBase64 = Buffer.from(await pdfDoc.save()).toString("base64");
 
+    /* --------------------- DOCX BUILDER --------------------- */
     const docChildren = [];
     const lines = plain.split("\n").map(l => l.trim()).filter(Boolean);
 
@@ -262,6 +256,9 @@ app.post("/ask", verifyOrigin, async (req, res) => {
     const doc = new Document({ sections: [{ children: docChildren }] });
     const docxBase64 = Buffer.from(await Packer.toBuffer(doc)).toString("base64");
 
+    /* --------------------- ATTACHMENTS (UPDATED FILENAMES) ------ */
+    const safeTs = isoNow.replace(/[:]/g, "-");
+
     const payload = {
       Messages: [
         {
@@ -275,13 +272,13 @@ app.post("/ask", verifyOrigin, async (req, res) => {
           Attachments: [
             {
               ContentType: "application/pdf",
-              Filename: "Budget-2025-Report.pdf",
+              Filename: `budget-compliance-${safeTs}.pdf`,
               Base64Content: pdfBase64
             },
             {
               ContentType:
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-              Filename: "Budget-2025-Report.docx",
+              Filename: `budget-assist-${safeTs}.docx`,
               Base64Content: docxBase64
             }
           ]
