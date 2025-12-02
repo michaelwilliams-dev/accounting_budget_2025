@@ -15,7 +15,6 @@
       color: #333;
     }
 
-    /* ISO TIMESTAMP AT TOP */
     #page-iso {
       font-size: 0.95rem;
       color: #4e65ac;
@@ -24,7 +23,6 @@
       font-weight: bold;
     }
 
-    /* Page headings aligned left */
     h2, h3 {
       text-align: left !important;
       color: #4e65ac;
@@ -54,6 +52,21 @@
     }
     button:hover { background-color: #3c5093; }
 
+    .starter-btn {
+      background:#e8ecf7;
+      border:1px solid #4e65ac;
+      color:#4e65ac;
+      padding:8px 10px;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:0.9rem;
+      margin-right:5px;
+      margin-bottom: 8px;
+    }
+    .starter-btn:hover {
+      background:#d9e3ff;
+    }
+
     .terms-box {
       font-size: 14px;
       margin-top: 15px;
@@ -78,7 +91,6 @@
       min-height: 1em;
     }
 
-    /* Report headings smaller + left */
     #response h1 {
       font-size: 1.4rem;
       text-align: left !important;
@@ -95,7 +107,6 @@
 </head>
 <body>
 
-  <!-- ISO TIMESTAMP at top -->
   <div id="page-iso">🕒 ISO Timestamp: <span id="iso-timestamp"></span></div>
 
   <h2>Budget Assistant</h2>
@@ -104,6 +115,24 @@
     Autumn Budget 2024 data indexed and available for semantic analysis.
     Updated weekly as HM Treasury and OBR issue revisions.
   </p>
+
+  <!-- ⭐ THREE STARTER BUTTONS -->
+  <div style="margin-bottom: 15px;">
+    <button class="starter-btn" 
+            data-question="Give me all the changes in the 2025 Budget">
+      All Budget 2025 Changes
+    </button>
+
+    <button class="starter-btn"
+            data-question="Give me the overview of the OBR report">
+      OBR Overview
+    </button>
+
+    <button class="starter-btn"
+            data-question="Give me an overview of the Bank of England’s approach to innovation in artificial intelligence and distributed ledger technology">
+      Bank of England AI Overview
+    </button>
+  </div>
 
   <label for="clarification">Question or topic</label>
   <textarea id="clarification"
@@ -129,7 +158,6 @@
 
   <button id="generate">Generate Budget Report</button>
 
-  <!-- NEW CLEAR BUTTON (ONLY CHANGE MADE) -->
   <button id="clear"
     style="display:none; background:#4e65ac; color:white;
            padding:10px; border:none; border-radius:6px;
@@ -141,46 +169,6 @@
   <div id="response"></div>
 
   <script src="script.js?v=2025-11-29T14:20:00Z"></script>
-
-  <script>
-    const termsCheckbox = document.getElementById("termsCheckbox");
-    const generateBtn = document.getElementById("generate");
-    termsCheckbox.addEventListener("change", () => {
-      generateBtn.disabled = !termsCheckbox.checked;
-    });
-  </script>
-
-  <script>
-    function sendHeight() {
-      window.parent.postMessage(
-        { type: "resizeIframe", height: document.body.scrollHeight },
-        "*"
-      );
-    }
-    window.addEventListener("load", sendHeight);
-    new ResizeObserver(sendHeight).observe(document.body);
-  </script>
-
-  <script>
-    const clarificationBox = document.getElementById("clarification");
-    const wordWarning = document.getElementById("wordWarning");
-    const generateButton = document.getElementById("generate");
-
-    function checkWords() {
-      const words = clarificationBox.value.trim().split(/\s+/).filter(Boolean);
-      if (words.length < 3) {
-        wordWarning.textContent =
-          "Please enter a full question or topic — at least 3 words are required.";
-        generateButton.disabled = true;
-      } else {
-        wordWarning.textContent = "";
-        generateButton.disabled = false;
-      }
-    }
-
-    clarificationBox.addEventListener("input", checkWords);
-    window.addEventListener("load", checkWords);
-  </script>
 
 </body>
 </html>
