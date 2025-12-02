@@ -98,7 +98,8 @@ ${savingClause}
 
   /* ---------------- FIXED OPENAI PROMPT ---------------- */
   const prompt = `
-Return CLEAN HTML ONLY — no markdown.
+Produce the report directly in HTML format.
+Do NOT write the words "html", "HTML", or meta instructions in your output.
 
 You MUST produce a complete structured Budget 2025 report.
 Use ONLY the context below.
