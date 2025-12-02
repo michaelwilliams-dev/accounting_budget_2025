@@ -2,7 +2,8 @@
 // ISO Timestamp: 🕒 2025-11-29T13:45:00Z
 // ✔ Correct output element (#response)
 // ✔ Handles backend fields: html, answer, reportText
-// ✔ Clear button added (question + output only)
+// ✔ Clear button logic
+// ✔ Starter buttons added
 
 console.log("CLIENT JS VERSION = v2025-11-29T13:45:00Z (Budget/Accountant Assistant)");
 
@@ -10,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const $ = (id) => document.getElementById(id);
 
   const generateBtn = $("generate");
-  const clearBtn = $("clear");              // ← NEW
+  const clearBtn = $("clear");
   const output = $("response");
 
   const emailInput = $("email");
@@ -30,6 +31,17 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("❌ Missing #response container in HTML");
     return;
   }
+
+  /* ⭐ STARTER BUTTON LOGIC */
+  const starterButtons = document.querySelectorAll(".starter-btn");
+
+  starterButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const q = btn.getAttribute("data-question");
+      clarificationInput.value = q;
+      generateBtn.click();  // auto-run
+    });
+  });
 
   generateBtn.addEventListener("click", async () => {
     const question = clarificationInput?.value?.trim() || "";
@@ -70,7 +82,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       console.log("📥 [CLIENT /ask] Response:", data);
 
-      // Corrected response handler
       if (data?.html) {
         output.innerHTML = data.html;
       } else if (data?.answer) {
@@ -82,7 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
         console.warn("⚠️ Unexpected backend response structure:", data);
       }
 
-      // ---- SHOW CLEAR BUTTON (NEW) ----
+      // Show Clear button after report
       if (clearBtn) clearBtn.style.display = "block";
 
     } catch (err) {
@@ -92,12 +103,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ---- CLEAR BUTTON LOGIC (NEW) ----
+  // Clear button logic
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
-      if (clarificationInput) clarificationInput.value = ""; // clear question only
-      if (output) output.innerHTML = "";                    // clear output
-      clearBtn.style.display = "none";                      // hide button again
+      if (clarificationInput) clarificationInput.value = "";
+      if (output) output.innerHTML = "";
+      clearBtn.style.display = "none";
     });
   }
 });
