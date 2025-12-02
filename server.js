@@ -1,5 +1,5 @@
-// server.js — Budget 2025 Assistant (FINAL FIXED VERSION)
-// ISO Timestamp: 2025-11-30T19:10:00Z
+// server.js — Budget 2025 Assistant (Saving Clause & Timestamp FIXED)
+// ISO Timestamp: 2025-11-30T20:30:00Z
 
 import express from "express";
 import bodyParser from "body-parser";
@@ -69,19 +69,26 @@ async function runSemanticSearch(question) {
 /* ---------------------------- REPORT BUILDER ---------------------------- */
 async function generateHTMLReport(question) {
   const { context, chunks } = await runSemanticSearch(question);
+  const isoNow = new Date().toISOString();
 
+  // FIXED: Saving clause moved OUTSIDE the report
   const savingClause = `
-<h2>11. Saving Clause</h2>
-<p style="font-size:0.9rem;color:#555;">
-This report has been generated automatically by AIVS Software Limited.
-It is provided for internal guidance only and does not constitute
-formal accounting, tax, financial, or legal advice.
-</p>`;
+<div class="saving-clause" style="margin-top:25px; padding-top:10px; border-top:1px solid #ccc;">
+  <p style="font-size:0.9rem;color:#555;">
+    <strong>Report Timestamp:</strong> ${isoNow}<br><br>
+    This report has been generated automatically by AIVS Software Limited.
+    It is provided for internal guidance only and does not constitute
+    formal accounting, tax, financial, or legal advice.
+  </p>
+</div>
+`;
 
+  /* ---------------- EMPTY CONTEXT REPORT ---------------- */
   if (!context.trim()) {
     return `
 <div class="report">
 <h1>Budget 2025 Report</h1>
+
 <h2>1. Query Restated</h2><p>${question}</p>
 <h2>2. Measures</h2><ul><li>No relevant Budget 2025 measures found.</li></ul>
 <h2>3. Figures</h2><ul><li>No figures in indexed data.</li></ul>
@@ -92,18 +99,17 @@ formal accounting, tax, financial, or legal advice.
 <h2>8. Reason</h2><p>Budget 2025 did not introduce measures in this area.</p>
 <h2>9. Current HMRC Rules</h2><ul><li>Existing rules apply.</li></ul>
 <h2>10. Advisory Notes</h2><ul><li>Monitor HM Treasury updates.</li></ul>
-${savingClause}
-</div>`.trim();
+</div>
+
+${savingClause}`.trim();
   }
 
-  /* ---------------- FIXED OPENAI PROMPT ---------------- */
+  /* ---------------- FIXED OPENAI PROMPT (no saving clause inside) ---------------- */
   const prompt = `
 Produce the report directly in HTML format.
-Do NOT write the words "html", "HTML", or meta instructions in your output.
+Do NOT write the words "html", "HTML", or meta instructions.
 
-You MUST produce a complete structured Budget 2025 report.
-Use ONLY the context below.
-If something is missing, state this clearly.
+Use ONLY the context provided.
 
 <div class="report">
 
@@ -114,38 +120,36 @@ If something is missing, state this clearly.
 
 <h2>2. Relevant Budget 2025 Measures</h2>
 <ul>
-[Extract all measures related to the query from the Budget 2025 context]
+[Extract measures from context]
 </ul>
 
 <h2>3. Key Figures & Thresholds</h2>
 <ul>
-[Extract monetary figures, limits, thresholds or percentages]
+[Extract numbers from context]
 </ul>
 
 <h2>4. OBR Commentary</h2>
-<p>[Summarise any OBR commentary from the context]</p>
+<p>[Summarise OBR commentary]</p>
 
 <h2>5. Practical Implications</h2>
-<ul>[Explain practical impacts strictly using context]</ul>
+<ul>[Explain impacts using ONLY context]</ul>
 
 <h2>6. Source References</h2>
 <ul>
-${chunks.map(c => `<li>${c.file || "Unknown source"}</li>`).join("\n")}
+${chunks.map(c => `<li>${c.file || "Unknown source"}</li>`).join("")}
 </ul>
 
 <h2>7. Summary</h2>
-<p>[Provide the main summary]</p>
+<p>[Final summary]</p>
 
 <h2>8. Reason</h2>
-<p>[Explain why details may be limited]</p>
+<p>[Why limited]</p>
 
 <h2>9. Current HMRC Rules</h2>
-<ul>[Summarise HMRC rules relevant to this topic]</ul>
+<ul>[HMRC rules summary]</ul>
 
 <h2>10. Advisory Notes</h2>
-<ul>[Provide safe, non-speculative advisory notes]</ul>
-
-${savingClause}
+<ul>[General safe notes]</ul>
 
 </div>
 
@@ -154,12 +158,20 @@ ${context}
   `.trim();
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [{ role: "user", content: prompt }]
   });
 
-  return `<div class="aivs-html-output">${completion.choices[0].message.content}</div>`;
+  // FIXED: saving clause appended BELOW the report
+  return `
+<div class="aivs-html-output">
+${completion.choices[0].message.content}
+</div>
+
+${savingClause}
+`.trim();
 }
 
 /* ---------------------------- /ASK (EMAIL + PDF + DOCX) ---------------------------- */
@@ -170,7 +182,7 @@ app.post("/ask", verifyOrigin, async (req, res) => {
   try {
     const html = await generateHTMLReport(question);
 
-    /* ---------- CLEAN TEXT FOR PDF/DOCX ---------- */
+    /* CLEAN TEXT FOR PDF/DOCX (unchanged) */
     const plain = html
       .replace(/<h1>/g, "\n# ")
       .replace(/<\/h1>/g, "\n\n")
@@ -183,7 +195,8 @@ app.post("/ask", verifyOrigin, async (req, res) => {
       .replace(/<br\s*\/?>/g, "\n")
       .replace(/<[^>]+>/g, "");
 
-    /* --------------------- PDF --------------------- */
+    /* USB: PDF + DOCX + Email unchanged from your file */
+    // --------------------------------------------------
     const pdfDoc = await PDFDocument.create();
     let page = pdfDoc.addPage([595, 842]);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -203,14 +216,10 @@ app.post("/ask", verifyOrigin, async (req, res) => {
 
     const pdfBase64 = Buffer.from(await pdfDoc.save()).toString("base64");
 
-    /* --------------------- DOCX (FORMATTED STRUCTURED VERSION) --------------------- */
     const docChildren = [];
-
     const lines = plain.split("\n").map(l => l.trim()).filter(Boolean);
 
     for (const line of lines) {
-
-      // H1
       if (line.startsWith("# ")) {
         docChildren.push(
           new Paragraph({
@@ -221,7 +230,6 @@ app.post("/ask", verifyOrigin, async (req, res) => {
         continue;
       }
 
-      // H2
       if (line.startsWith("## ")) {
         docChildren.push(
           new Paragraph({
@@ -232,7 +240,6 @@ app.post("/ask", verifyOrigin, async (req, res) => {
         continue;
       }
 
-      // BULLETS
       if (line.startsWith("• ")) {
         docChildren.push(
           new Paragraph({
@@ -244,7 +251,6 @@ app.post("/ask", verifyOrigin, async (req, res) => {
         continue;
       }
 
-      // NORMAL PARAGRAPH
       docChildren.push(
         new Paragraph({
           children: [new TextRun({ text: line, size: 24 })],
@@ -256,7 +262,6 @@ app.post("/ask", verifyOrigin, async (req, res) => {
     const doc = new Document({ sections: [{ children: docChildren }] });
     const docxBase64 = Buffer.from(await Packer.toBuffer(doc)).toString("base64");
 
-    /* --------------------- EMAIL --------------------- */
     const payload = {
       Messages: [
         {
@@ -274,7 +279,8 @@ app.post("/ask", verifyOrigin, async (req, res) => {
               Base64Content: pdfBase64
             },
             {
-              ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              ContentType:
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
               Filename: "Budget-2025-Report.docx",
               Base64Content: docxBase64
             }
